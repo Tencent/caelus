@@ -1,0 +1,1 @@
+ARGS="--config=/etc/lighthouse/config.yaml --v=3"

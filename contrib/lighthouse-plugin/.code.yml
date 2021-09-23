@@ -1,0 +1,3 @@
+source:
+  test_source:
+    filepath_regex: [".*/"]

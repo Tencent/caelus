@@ -1,0 +1,19 @@
+apiVersion: componentconfig.lighthouse.io/v1alpha1
+kind: HookConfiguration
+timeout: 10
+listenAddress: unix:///var/run/lighthouse.sock
+webhooks:
+  - name: versioned
+    endpoint: unix://@plugin-server
+    failurePolicy: Fail
+    stages:
+      - urlPattern: /{id:v[.0-9]+}/containers/create
+        method: post
+        type: PreHook
+  - name: non-versioned
+    endpoint: unix://@plugin-server
+    failurePolicy: Fail
+    stages:
+      - urlPattern: /containers/create
+        method: post
+        type: PreHook

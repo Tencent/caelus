@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o pipefail
+set -o nounset
+
+BASE_DIR=$(cd $(dirname $0)/.. && pwd)
+source ${BASE_DIR}/hack/common.sh
+
+COMMIT_NUM=$(git log --oneline | wc -l | sed -e 's/^[ \t]*//')
+RPM_VERSION=${GIT_VERSION:1}
+RPM_IMAGE="plugin-server-${RPM_VERSION}:${COMMIT_NUM}"
+
+cd $BASE_DIR
+
+git archive -o ${OUTPUT_PATH}/plugin-server.tar.gz \
+  --format=tar \
+  --prefix=plugin-server-${RPM_VERSION}/ \
+  HEAD
+
+cp ${BASE_DIR}/build/Dockerfile ${OUTPUT_PATH}
+cp ${BASE_DIR}/build/plugin-server.spec ${OUTPUT_PATH}
+
+cat >>${OUTPUT_PATH}/Dockerfile <<EOF
+
+COPY plugin-server.spec /root/rpmbuild/SPECS
+COPY plugin-server.tar.gz /root/rpmbuild/SOURCES
+RUN echo '%_topdir /root/rpmbuild' > /root/.rpmmacros \
+          && echo '%__os_install_post %{nil}' >> /root/.rpmmacros \
+                  && echo '%debug_package %{nil}' >> /root/.rpmmacros
+WORKDIR /root/rpmbuild/SPECS
+
+ENV GIT_COMMIT=${GIT_COMMIT}
+ENV GIT_VERSION=${GIT_VERSION}
+ENV GIT_STATUS=${GIT_STATUS}
+
+RUN rpmbuild -bb \
+  --define 'version ${RPM_VERSION}' \
+  --define 'commit ${COMMIT_NUM}' \
+  plugin-server.spec
+EOF
+
+(cd "${OUTPUT_PATH}" && docker build --network=host -t "$RPM_IMAGE" .)
+docker run --rm "$RPM_IMAGE" bash -c 'cd /root/rpmbuild && tar -c *RPMS' | tar xvC "${OUTPUT_PATH}"

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o pipefail
+set -o nounset
+
+BASE_DIR=$(cd $(dirname $0)/.. && pwd)
+source ${BASE_DIR}/hack/common.sh
+
+go build -o ${OUTPUT_PATH}/bin/${PACKAGE_NAME} \
+  -ldflags "-X github.com/mYmNeo/version/verflag.ReleaseName=${PACKAGE_NAME} \
+  -X github.com/mYmNeo/version.gitCommit=${GIT_COMMIT} \
+  -X github.com/mYmNeo/version.gitTreeState=${TREE_STATE} \
+  -X github.com/mYmNeo/version.gitVersion=${GIT_VERSION} \
+  -X github.com/mYmNeo/version.gitMajor=${GIT_MAJOR} \
+  -X github.com/mYmNeo/version.gitMinor=${GIT_MINOR} \
+  -X github.com/mYmNeo/version.buildDate=${BUILD_DATE}" \
+  ${PACKAGE}/cmd/lighthouse

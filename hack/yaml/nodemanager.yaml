@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    mixer.kubernetes.io/app-class: greedy
+  labels:
+    app: node-manager
+  name: node-manager
+  namespace: hadoop-yarn
+spec:
+  selector:
+    matchLabels:
+      app: node-manager
+  template:
+    metadata:
+      annotations:
+        mixer.kubernetes.io/app-class: greedy
+      labels:
+        app: node-manager
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - node-manager
+            topologyKey: kubernetes.io/hostname
+      containers:
+        env:
+        - name: GINIT_PORT
+          value: xxx
+        - name: USER
+          value: xxx
+        - name: GROUP
+          value: xxx
+        - name: HADOOP_CONF_DIR
+          value: /xxx
+        - name: HADOOP_YARN_HOME
+          value: /xxx
+        - name: PID_FILE
+          value: /xxx/yarn-nodemanager.pid
+        - name: CGROUP_PATH
+          value: /sys/fs/cgroup
+        - name: CONTAINER_EXECUTOR
+          value: org.apache.hadoop.yarn.server.nodemanager.LinuxContainerExecutor
+        - name: NM_LOCAL_DIRS
+          value: /xxx
+        - name: MY_NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        image: xxxx
+        imagePullPolicy: IfNotPresent
+        name: node-manager
+        resources: {}
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        nodemanager: "true"
+      restartPolicy: Always

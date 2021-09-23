@@ -1,0 +1,189 @@
+{
+  "k8s_config": {
+    "kubelet_root_dir": "/data"
+  },
+  "check_point": {
+    "check_point_dir": "/var/run/caelus",
+    "node_resource_key": "node_resource"
+  },
+  "task_type": {
+    "online_type": "k8s",
+    "offline_type": "k8s"
+  },
+  "node_resource": {
+    "disable": false,
+    "disable_kill_if_normal": false,
+    "update_interval": "10s",
+    "yarn_config": {
+      "capacity_inc_interval": "1m",
+      "nm_server": "http://localhost:10010",
+      "resource_roundoff": {
+        "cpu_milli": 1000,
+        "mem_mb": 512
+      },
+      "resource_range": {
+        "cpu_milli": {
+          "min": 1000,
+          "max": 2000,
+          "ratio": 0.1
+        },
+        "mem_mb": {
+          "min": 512,
+          "max": 1024,
+          "ratio": 0.1
+        }
+      },
+      "port_auto_detect": true,
+      "properties": {},
+      "disks": {
+        "ratio_to_core": 50,
+        "multi_disk_disable": false,
+        "disk_min_capacity_gb": 500,
+        "space_check_enabled": true,
+        "space_check_period": "10m",
+        "space_check_reserved_gb": 50,
+        "space_clean_disable": false,
+        "space_clean_just_data": false,
+        "offline_exited_clean_delay": "25m"
+      }
+    },
+    "silence": {
+      "periods": [],
+      "ahead_of_unSchedule": "5m"
+    }
+  },
+  "predicts": [{
+    "disable": false,
+    "predict_type": "local",
+    "predict_server_addr": "",
+    "reserve_resource": {
+      "cpu_milli": 1000,
+      "mem_mb": 5120,
+      "cpu_percent": "20%",
+      "mem_percent": "20%"
+    }
+  }],
+  "metrics": {
+    "node": {
+      "collect_interval": "15s",
+      "ifaces_xxx": ["xxx_normal"],
+      "disk_names": ["vdb"],
+      "system_processes": ["rcu_sched"]
+    },
+    "container": {
+      "resources": [
+        "cpu",
+        "memory"
+      ],
+      "cgroups": [
+        "/kubepods"
+      ],
+      "collect_interval": "15s",
+      "max_housekeeping_interval": "1m"
+    },
+    "perf": {
+      "disable": false,
+      "collect_interval": "1m",
+      "collect_duration": "1s",
+      "ignored_cgroups": ["/kubepods/besteffort", "/kubepods/offline"]
+    },
+    "rdt": {
+      "disable": false,
+      "rdt_command": "",
+      "collect_interval": "1m",
+      "collect_duration": "2s",
+      "execute_interval": "2s"
+    },
+    "prometheus": {
+      "collect_interval":"5s",
+      "disable_show": false,
+      "items": [{
+        "address":"http://xxx/metrics",
+        "collect":["xx"],
+        "no_collect":[]
+      }]
+    }
+  },
+  "resource_isolate": {
+    "disable": false,
+    "resource_disable": {"netio":true, "diskio":true},
+    "update_period": "1m",
+    "cpu_config": {
+      "auto_detect": true,
+      "manage_policy": "",
+      "cpuset_config": {
+        "enable_online_isolate": false,
+        "reserved_cpus": ""
+      },
+      "cpu_quota_config": {
+        "offline_share": 102
+      }
+    }
+  },
+  "alarm": {
+    "enable": false,
+    "ignore_alarm_when_silence": false,
+    "cluster": "xxx",
+    "message_batch": 1,
+    "message_delay": "1m",
+    "channel_name": "local",
+    "alarm_channel": {
+      "local": {
+        "executor": "xxx"
+      },
+      "remote": {
+        "remoteWebhook": "",
+        "weWorkWebhook": "http://xxx"
+      }
+    }
+  },
+  "online": {
+    "enable": false,
+    "pid_to_cgroup": {
+      "pids_check_interval": "0s",
+      "cgroup_check_interval": "1m",
+      "batch_num": 50
+    },
+    "jobs": [
+      {
+        "name": "xxx",
+        "command": "xxx",
+        "metrics": [
+          {
+            "name": "latency",
+            "source": {
+              "check_interval": "1m",
+              "metrics_command": ["/xxx"],
+              "cmd_need_chroot": false,
+              "metrics_url": ""
+            }
+          }
+        ]
+      },
+      {
+        "metrics": [
+          {
+            "source": {
+              "check_interval": "1m",
+              "metrics_command": "",
+              "metrics_url": "http://xx"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "disk_quota": {
+    "enabled": false,
+    "check_period": "3m",
+    "container_runtime": "docker",
+    "volume_sizes": {
+      "rootFs": {
+        "quota": 20480000000,
+        "inodes": 10000000
+      },
+      "emptyDir": {},
+      "hostPath": {}
+    }
+  }
+}

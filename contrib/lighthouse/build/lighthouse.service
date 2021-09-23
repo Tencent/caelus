@@ -1,0 +1,19 @@
+[Unit]
+Description=Lighthouse server
+Before=kubelet.service
+
+[Service]
+Type=notify
+EnvironmentFile=-/etc/lighthouse/config
+ExecStart=/usr/bin/lighthouse $ARGS
+Restart=always
+
+LimitNOFILE=infinity
+LimitNPROC=infinity
+LimitCORE=infinity
+# Uncomment TasksMax if your systemd version supports it.
+# Only systemd 226 and above support this version.
+TasksMax=infinity
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o pipefail
+set -o nounset
+
+BASE_DIR=$(cd $(dirname $0)/.. && pwd)
+source ${BASE_DIR}/hack/common.sh
+
+mkdir -p ${OUTPUT_PATH}/${PACKAGE_PREFIX}
+ln -s ${BASE_DIR} ${OUTPUT_PATH}/${PACKAGE}
+${BASE_DIR}/hack/update-codegen.sh
