@@ -39,4 +39,4 @@ The code team will monitor all pull request. Before submitting a pull request, p
 We use gofmt to check code styles. Make sure gofmt cmd/... pkg/... contrib/... passes
 
 ## License
-Caelus is under the Apache License 2.0. See the [License](../License) file for details.
+Caelus is under the Apache License 2.0. See the [License](../LICENSE) file for details.
