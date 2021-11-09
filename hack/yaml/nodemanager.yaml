@@ -29,7 +29,7 @@ spec:
                 - node-manager
             topologyKey: kubernetes.io/hostname
       containers:
-        env:
+      - env:
         - name: GINIT_PORT
           value: xxx
         - name: USER
