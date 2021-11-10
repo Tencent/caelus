@@ -148,7 +148,7 @@ type NodeCpu struct {
 
 ### Container rules
   Container rules describe how to detect metrics of container level, the supported metrics could be found from
-   [container metrics](../pkg/caelus/statestore/cgroup/cgroup.go), like "nr_cpu_throttled" as following:
+   [container metrics](../pkg/caelus/statestore/cgroup/types.go), like "nr_cpu_throttled" as following:
 ```go
 // CgroupStats contains cgroup stats
 type CgroupStats struct {
@@ -162,10 +162,7 @@ type CgroupStats struct {
 ```json
 {
  "metrics": [
-     "mem_direct_reclaim",
-     "mem_direct_compact",
-     "nr_cpu_throttled",
-     "write_latency"
+     "nr_cpu_throttled"
  ],
  "check_interval": "5s",
  "handle_interval": "10s",
@@ -176,20 +173,7 @@ type CgroupStats struct {
        {
          "name": "expression",
          "args": {
-           "expression": "mem_direct_reclaim > 0 || mem_direct_compact > 0"
-         }
-       },
-       {
-         "name": "expression",
-         "args": {
            "expression": "nr_cpu_throttled > 0"
-         }
-       },
-       {
-         "name": "ewma",
-         "args": {
-           "metric": "write_latency",
-           "nr":100
          }
        }
      ]

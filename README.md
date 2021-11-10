@@ -41,7 +41,7 @@ Find more usage at [Tutorial.md](doc/tutorial.md). The project also have two att
 
 ## Getting started
 
-### build
+### Build
 
 ``` sh
 # binary build, which generates binary under _output/bin/
@@ -55,12 +55,26 @@ $ make test
 ```
 
 ### Run
+The caelus should better run on the node with the kubelet process, and write the kubelet's "root-dir" value to "kubelet_root_dir" in [config file](hack/config/caelus.json).
+
+The [config file](hack/config/caelus.json) and [rule file](hack/config/rules.json) are just the example files, you could add more
+feature based on different demands.
 
 ```sh
 # running in script
-$ caelus --config=hack/config/caelus.json --hostname-override=xxx --v=2
+$ mkdir -p /etc/caelus/
+$ cp hack/config/rules.json /etc/caelus/
+$ # if the batch job is running on YARN, you must modify the "offline_type" in hack/config/caelus.json as "yarn_on_k8s", and run the command
+$ caelus --config=hack/config/caelus.json --v=2
+$ # if the batch job is running on K8S, you must modify the "offline_type" in hack/config/caelus.json as "k8s", and run the command
+$ # if the command is running inside the pod, then you could ignore the kubeconfig parameter
+$ caelus --config=hack/config/caelus.json --hostname-override=xxx --v=2 --kubeconfig=xxx
 
-# running in image
+# run in container
+$ # the container parameters and environments could be found from hack/yaml/caelus.json, such as:
+$ docker run -it --cap-add SYS_ADMIN --cap-add NET_ADMIN --cap-add MKNOD --cap-add SYS_PTRACE --cap-add SYS_CHROOT --cap-add SYS_NICE -v /:/rootfs -v /sys:/sys -v /dev/disk:/dev/disk xxxx /bin/bash
+
+# running on K8S
 $ kubectl create -f hack/yaml/caelus.yaml
 $ kubectl label node colation=true
 $ kubectl -n kube-system get daemonset

@@ -47,15 +47,15 @@ data:
   caelus.json: |
     {
       "k8s_config": {
-        "kubelet_root_dir": "/data"
+        "kubelet_root_dir": "/var/lib/kubelet"
       },
       "check_point": {
         "check_point_dir": "/var/run/caelus",
         "node_resource_key": "node_resource"
       },
       "task_type": {
-        "online_type": "local",
-        "offline_type": "yarn_on_k8s"
+        "online_type": "k8s",
+        "offline_type": "k8s"
       },
       "node_resource": {
         "disable": false,
@@ -83,11 +83,11 @@ data:
               "ratio": 0.1
             }
           },
-          "port_auto_detect": true,
+          "port_auto_detect": false,
           "properties": {},
           "disks": {
             "ratio_to_core": 50,
-            "multi_disk_disable": false,
+            "multi_disk_disable": true,
             "disk_min_capacity_gb": 500,
             "space_check_enabled": true,
             "space_check_period": "10m",
@@ -98,14 +98,9 @@ data:
             "offline_exited_clean_delay": "25m"
           },
           "cpu_over_commit": {
-            "enable": true,
-            "over_commit_percent": 1.5,
-            "periods": [
-              {
-                "range": ["15:00","16:00"],
-                "over_commit_percent": 1.6
-              }
-            ]
+            "enable": false,
+            "over_commit_percent": 1,
+            "periods": []
           }
         },
         "silence": {
@@ -127,9 +122,9 @@ data:
       "metrics": {
         "node": {
           "collect_interval": "15s",
-          "ifaces_xxx": ["xxx_normal"],
-          "disk_names": ["vdb"],
-          "system_processes": ["rcu_sched"]
+          "ifaces_xxx": [],
+          "disk_names": ["sda"],
+          "system_processes": []
         },
         "container": {
           "resources": [
@@ -157,12 +152,8 @@ data:
         },
         "prometheus": {
           "collect_interval":"5s",
-          "disable_show": false,
-          "items": [{
-            "address":"http://xxx/metrics",
-            "collect":["xx"],
-            "no_collect":[]
-          }]
+          "disable_show": true,
+          "items": []
         }
       },
       "resource_isolate": {
@@ -170,8 +161,8 @@ data:
         "resource_disable": {"netio":true, "diskio":true},
         "update_period": "1m",
         "cpu_config": {
-          "auto_detect": true,
-          "manage_policy": "",
+          "auto_detect": false,
+          "manage_policy": "quota",
           "cpuset_config": {
             "enable_online_isolate": false,
             "reserved_cpus": ""
@@ -185,17 +176,17 @@ data:
       "alarm": {
         "enable": false,
         "ignore_alarm_when_silence": false,
-        "cluster": "xxx",
+        "cluster": "",
         "message_batch": 1,
         "message_delay": "1m",
         "channel_name": "local",
         "alarm_channel": {
           "local": {
-            "executor": "xxx"
+            "executor": ""
           },
           "remote": {
             "remoteWebhook": "",
-            "weWorkWebhook": "http://xxx"
+            "weWorkWebhook": ""
           }
         }
       },
@@ -208,14 +199,14 @@ data:
         },
         "jobs": [
           {
-            "name": "xxx",
-            "command": "xxx",
+            "name": "",
+            "command": "",
             "metrics": [
               {
-                "name": "latency",
+                "name": "",
                 "source": {
                   "check_interval": "1m",
-                  "metrics_command": ["/xxx"],
+                  "metrics_command": [],
                   "cmd_need_chroot": false,
                   "metrics_url": ""
                 }
@@ -318,67 +309,6 @@ data:
                 ]
               }
             ]
-          },
-          {
-            "name": "diskio",
-            "metrics": [
-                "$dev_diskio_util",
-                "$dev_diskio_write_kibps",
-                "$dev_diskio_write_iops",
-                "cpu_avg"
-            ],
-            "check_interval": "5s",
-            "handle_interval": "10s",
-            "recover_interval": "15s",
-            "rules": [
-              {
-                "detects": [
-                  {
-                    "name": "expression",
-                    "args": {
-                      "expression": "$dev_diskio_write_kibps > 100*1024 || $dev_diskio_write_iops > 100 ",
-                      "warning_count": 2
-                    }
-                  }
-                ],
-                "actions": [
-                  {
-                    "name": "adjust",
-                    "args": {
-                      "resources": [
-                        {
-                          "resource": "cpu",
-                          "step_percent": 0.2
-                        }
-                      ]
-                    }
-                  },
-                  {
-                    "name": "schedule",
-                    "args": {}
-                  }
-                ]
-              }
-            ],
-            "recover_rules": [
-              {
-                "detects": [
-                  {
-                    "name": "expression",
-                    "args": {
-                      "expression": "cpu_avg > 0.3",
-                      "warning_count": 2
-                    }
-                  }
-                ],
-                "actions": [
-                  {
-                    "name": "schedule",
-                    "args": {}
-                  }
-                ]
-              }
-            ]
           }
         ],
         "container_rules": [
@@ -403,119 +333,7 @@ data:
             ]
           }
         ],
-        "app_rules": [
-          {
-            "name": "slo",
-            "metrics": [
-                "slo_min",
-                "slo_max"
-            ],
-            "check_interval": "5s",
-            "handle_interval": "10s",
-            "recover_interval": "15s",
-            "rules": [
-              {
-                "detects": [
-                  {
-                    "name": "expression",
-                    "args": {
-                      "expression": "slo_min < 0.1"
-                    }
-                  }
-                ],
-                "actions": [
-                  {
-                    "name": "schedule",
-                    "args": {}
-                  }
-                ]
-              },
-              {
-                "detects": [
-                  {
-                    "name": "expression",
-                    "args": {
-                      "expression": "slo_min < 0.05"
-                    }
-                  }
-                ],
-                "actions": [
-                  {
-                    "name": "adjust",
-                    "args": {
-                      "op": "loop",
-                      "resources": [
-                        {
-                          "resource": "cpu",
-                          "step": "1000m"
-                        },
-                        {
-                          "resource": "memory",
-                          "step": "1073741824"
-                        }
-                      ]
-                    }
-                  }
-                ]
-              }
-            ],
-            "recover_rules": [
-              {
-                "detects": [
-                  {
-                    "name": "expression",
-                    "args": {
-                      "expression": "slo_max < 0.2"
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "name": "osd:latency",
-            "metrics": [
-                "value",
-                "slo",
-                "count"
-            ],
-            "check_interval": "5s",
-            "handle_interval": "10s",
-            "recover_interval": "15s",
-            "rules": [
-              {
-                "detects": [
-                  {
-                    "name": "expression",
-                    "args": {
-                      "expression": "value > slo && count > 50",
-                      "warning_count": 3
-                    }
-                  }
-                ],
-                "actions": [
-                  {
-                    "name": "schedule",
-                    "args": {}
-                  }
-                ]
-              }
-            ],
-            "recover_rules": [
-              {
-                "detects": [
-                  {
-                    "name": "expression",
-                    "args": {
-                      "expression": "value < 0.9 * slo",
-                      "warning_count": 3
-                    }
-                  }
-                ]
-              }
-            ]
-          }
-        ]
+        "app_rules": []
       },
       "notify_config": {
         "memory_cgroup": {

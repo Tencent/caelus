@@ -77,82 +77,12 @@
             ]
           }
         ]
-      },
-      {
-        "name": "diskio",
-        "metrics": [
-            "$dev_diskio_util",
-            "$dev_diskio_write_kibps",
-            "$dev_diskio_write_iops",
-            "cpu_avg"
-        ],
-        "check_interval": "5s",
-        "handle_interval": "10s",
-        "recover_interval": "15s",
-        "rules": [
-          {
-            "detects": [
-              {
-                "name": "expression",
-                "args": {
-                  "expression": "$dev_diskio_write_kibps > 100*1024 || $dev_diskio_write_iops > 100 ",
-                  "warning_count": 2
-                }
-              }
-            ],
-            "actions": [
-              {
-                "name": "adjust",
-                "args": {
-                  "resources": [
-                    {
-                      "resource": "cpu",
-                      "step_percent": 0.2
-                    }
-                  ]
-                }
-              },
-              {
-                "name": "schedule",
-                "args": {}
-              }
-            ]
-          }
-        ],
-        "recover_rules": [
-          {
-            "detects": [
-              {
-                "name": "expression",
-                "args": {
-                  "expression": "cpu_avg > 0.3",
-                  "warning_count": 2
-                }
-              }
-            ],
-            "actions": [
-              {
-                "name": "schedule",
-                "args": {}
-              }
-            ]
-          }
-        ]
       }
     ],
     "container_rules": [
       {
         "metrics": [
-            "mem_direct_reclaim",
-            "mem_direct_compact",
-            "memory_working_set_activate",
-            "nr_cpu_throttled",
-            "load_avg",
-            "cpu_request",
-            "tcp_oom",
-            "listen_overflows",
-            "read_latency",
-            "write_latency"
+            "nr_cpu_throttled"
         ],
         "check_interval": "5s",
         "handle_interval": "10s",
@@ -163,54 +93,7 @@
               {
                 "name": "expression",
                 "args": {
-                  "expression": "mem_direct_reclaim > 0 || mem_direct_compact > 0"
-                }
-              },
-              {
-                "name": "expression",
-                "args": {
                   "expression": "nr_cpu_throttled > 0"
-                }
-              },
-              {
-                "name": "expression",
-                "args": {
-                  "expression": "memory_working_set_activate > 0.1",
-                  "warning_count": 3
-                }
-              },
-              {
-                "name": "expression",
-                "args": {
-                  "expression": "load_avg > 2 * cpu_request"
-                }
-              },
-              {
-                "name": "expression",
-                "args": {
-                  "expression": "tcp_oom > 0.1",
-                  "warning_count": 3
-                }
-              },
-              {
-                "name": "expression",
-                "args": {
-                  "expression": "listen_overflows > 0.1",
-                  "warning_count": 3
-                }
-              },
-              {
-                "name": "ewma",
-                "args": {
-                  "metric": "read_latency",
-                  "nr":100
-                }
-              },
-              {
-                "name": "ewma",
-                "args": {
-                  "metric": "write_latency",
-                  "nr":100
                 }
               }
             ]
@@ -218,76 +101,7 @@
         ]
       }
     ],
-    "app_rules": [
-      {
-        "name": "xxx",
-        "metrics": [
-            "slo_min",
-            "slo_max"
-        ],
-        "check_interval": "5s",
-        "handle_interval": "10s",
-        "recover_interval": "15s",
-        "rules": [
-          {
-            "detects": [
-              {
-                "name": "expression",
-                "args": {
-                  "expression": "slo_min < 0.1"
-                }
-              }
-            ],
-            "actions": [
-              {
-                "name": "schedule",
-                "args": {}
-              }
-            ]
-          },
-          {
-            "detects": [
-              {
-                "name": "expression",
-                "args": {
-                  "expression": "slo_min < 0.05"
-                }
-              }
-            ],
-            "actions": [
-              {
-                "name": "adjust",
-                "args": {
-                  "op": "loop",
-                  "resources": [
-                    {
-                      "resource": "cpu",
-                      "step": "1000m"
-                    },
-                    {
-                      "resource": "memory",
-                      "step": "1073741824"
-                    }
-                  ]
-                }
-              }
-            ]
-          }
-        ],
-        "recover_rules": [
-          {
-            "detects": [
-              {
-                "name": "expression",
-                "args": {
-                  "expression": "slo_max < 0.2"
-                }
-              }
-            ]
-          }
-        ]
-      }
-    ]
+    "app_rules": []
   },
   "notify_config": {
     "memory_cgroup": {
