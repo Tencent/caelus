@@ -1,6 +1,6 @@
 {
   "k8s_config": {
-    "kubelet_root_dir": "/data"
+    "kubelet_root_dir": "/var/lib/kubelet"
   },
   "check_point": {
     "check_point_dir": "/var/run/caelus",
@@ -33,15 +33,16 @@
           "ratio": 0.1
         }
       },
-      "port_auto_detect": true,
+      "port_auto_detect": false,
       "properties": {},
       "disks": {
         "ratio_to_core": 50,
-        "multi_disk_disable": false,
+        "multi_disk_disable": true,
         "disk_min_capacity_gb": 500,
         "space_check_enabled": true,
         "space_check_period": "10m",
         "space_check_reserved_gb": 50,
+        "space_check_reserved_percent": 0.2,
         "space_clean_disable": false,
         "space_clean_just_data": false,
         "offline_exited_clean_delay": "25m"
@@ -66,9 +67,9 @@
   "metrics": {
     "node": {
       "collect_interval": "15s",
-      "ifaces_xxx": ["xxx_normal"],
-      "disk_names": ["vdb"],
-      "system_processes": ["rcu_sched"]
+      "ifaces_xxx": [],
+      "disk_names": ["sda"],
+      "system_processes": []
     },
     "container": {
       "resources": [
@@ -82,13 +83,13 @@
       "max_housekeeping_interval": "1m"
     },
     "perf": {
-      "disable": false,
+      "disable": true,
       "collect_interval": "1m",
       "collect_duration": "1s",
       "ignored_cgroups": ["/kubepods/besteffort", "/kubepods/offline"]
     },
     "rdt": {
-      "disable": false,
+      "disable": true,
       "rdt_command": "",
       "collect_interval": "1m",
       "collect_duration": "2s",
@@ -96,12 +97,8 @@
     },
     "prometheus": {
       "collect_interval":"5s",
-      "disable_show": false,
-      "items": [{
-        "address":"http://xxx/metrics",
-        "collect":["xx"],
-        "no_collect":[]
-      }]
+      "disable_show": true,
+      "items": []
     }
   },
   "resource_isolate": {
@@ -109,8 +106,8 @@
     "resource_disable": {"netio":true, "diskio":true},
     "update_period": "1m",
     "cpu_config": {
-      "auto_detect": true,
-      "manage_policy": "",
+      "auto_detect": false,
+      "manage_policy": "quota",
       "cpuset_config": {
         "enable_online_isolate": false,
         "reserved_cpus": ""
@@ -123,17 +120,17 @@
   "alarm": {
     "enable": false,
     "ignore_alarm_when_silence": false,
-    "cluster": "xxx",
+    "cluster": "",
     "message_batch": 1,
     "message_delay": "1m",
     "channel_name": "local",
     "alarm_channel": {
       "local": {
-        "executor": "xxx"
+        "executor": ""
       },
       "remote": {
         "remoteWebhook": "",
-        "weWorkWebhook": "http://xxx"
+        "weWorkWebhook": ""
       }
     }
   },
@@ -146,27 +143,16 @@
     },
     "jobs": [
       {
-        "name": "xxx",
-        "command": "xxx",
+        "name": "",
+        "command": "",
         "metrics": [
           {
-            "name": "latency",
+            "name": "",
             "source": {
               "check_interval": "1m",
-              "metrics_command": ["/xxx"],
+              "metrics_command": [],
               "cmd_need_chroot": false,
               "metrics_url": ""
-            }
-          }
-        ]
-      },
-      {
-        "metrics": [
-          {
-            "source": {
-              "check_interval": "1m",
-              "metrics_command": "",
-              "metrics_url": "http://xx"
             }
           }
         ]

@@ -721,7 +721,7 @@ func initCpuManagePolicy(config *CpuIsolateConfig, kubeletRootDir string) {
 	config.KubeletStatic = false
 	cpuMnFile := getCpuManagerFile(kubeletRootDir)
 	if policyBytes, err := ioutil.ReadFile(cpuMnFile); err != nil {
-		klog.Fatalf("cpu manager file(%s) err: %v", cpuMnFile, err)
+		klog.Errorf("cpu manager file(%s) read failed, please input the right kubelet root-dir: %v", cpuMnFile, err)
 	} else {
 		if strings.Contains(string(policyBytes), "static") {
 			// cpu manager policy is static
@@ -798,10 +798,6 @@ func initCPIManagerConfig(config *CPIManagerConfig) {
 
 // initOnlineConfig initialize online job default configuration
 func initOnlineConfig(config *OnlineConfig) {
-	if !config.Enable {
-		return
-	}
-
 	if config.PidToCgroup.CgroupCheckInterval.Seconds() == 0 {
 		config.PidToCgroup.CgroupCheckInterval = defaultOnlineCheckInterval
 	}
@@ -859,6 +855,8 @@ func existDisk(diskNames []string) []string {
 		_, err := os.Stat(p)
 		if err == nil {
 			exists = append(exists, disk)
+		} else {
+			klog.Errorf("the disk %s is not invalid", disk)
 		}
 	}
 	return exists
@@ -870,10 +868,13 @@ func existAndUps(ifaces []string) []string {
 	for _, iface := range ifaces {
 		nic, err := net.InterfaceByName(iface)
 		if err != nil {
+			klog.Errorf("the iface %s is not invalid", iface)
 			continue
 		}
 		if nic.Flags&net.FlagUp == 1 {
 			ups = append(ups, iface)
+		} else {
+			klog.Errorf("the iface %s is not up", iface)
 		}
 	}
 	return ups

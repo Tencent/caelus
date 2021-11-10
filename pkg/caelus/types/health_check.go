@@ -291,7 +291,7 @@ func initExpressionEvaluate(ruleCheck *RuleCheckConfig, detector *DetectConfig, 
 func generateMetricsWithDev(metrics, devices []string) []string {
 	var newMetrics []string
 	for _, m := range metrics {
-		if !strings.Contains(m, genericDev) || len(devices) == 0 {
+		if !strings.Contains(m, genericDev) {
 			newMetrics = append(newMetrics, m)
 		} else {
 			for _, dev := range devices {

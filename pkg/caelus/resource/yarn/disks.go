@@ -41,9 +41,11 @@ import (
 
 var (
 	// dataPartition is just for data path
+	// the path is prepared for nodemanager, and you should change the partition name as your own needs
 	dataPartitionInHost      = "/data"
 	dataPartitionInContainer = types.RootFS + "/data"
 
+	// you should change the regex as your own needs
 	dirRegexHost      = "^/data[1-9]$"
 	dirRegexContainer = "^" + types.RootFS + "/data[1-9]$"
 
@@ -110,6 +112,9 @@ func (d *DiskManager) DiskSpaceToCores() (*resource.Quantity, error) {
 		return diskSpaceCores, nil
 	}
 
+	if len(d.availablePartitions) == 0 {
+		return nil, fmt.Errorf("not found available partitions")
+	}
 	var totalSize int64 = 0
 	for _, p := range d.availablePartitions {
 		klog.V(4).Infof("partition(%s) disk space state: %+v", p.MountPoint, p.TotalSize)
@@ -333,9 +338,10 @@ func getAvailablePartitions(hostNamespace bool, multiDiskDisable bool, diskMinCa
 		klog.V(2).Infof("extra partitions disk is empty, adding /data info")
 		dataPartInfo, err := generatePartitionForDataPath(hostNamespace)
 		if err != nil {
-			klog.Fatalf("generate /data partition info failed: %v", err)
+			klog.Errorf("generate /data partition info failed: %v", err)
+		} else {
+			partInfos = append(partInfos, dataPartInfo)
 		}
-		partInfos = append(partInfos, dataPartInfo)
 	}
 
 	return partInfos
