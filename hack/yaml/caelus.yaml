@@ -387,7 +387,7 @@ spec:
       serviceAccountName: caelus
       containers:
       - name: caelus
-        image: xxx/caelus:xxx
+        image: ccr.ccs.tencentyun.com/caelus/caelus:v1.0.0
         imagePullPolicy: Always
         command: ["/caelus"]
         args:
