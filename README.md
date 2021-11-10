@@ -61,7 +61,7 @@ $ make test
 $ caelus --config=hack/config/caelus.json --hostname-override=xxx --v=2
 
 # running in image
-$ kubectl create -f hack/yaml/caelus.json
+$ kubectl create -f hack/yaml/caelus.yaml
 $ kubectl label node colation=true
 $ kubectl -n kube-system get daemonset
 ```
