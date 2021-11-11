@@ -72,7 +72,7 @@ $ caelus --config=hack/config/caelus.json --hostname-override=xxx --v=2 --kubeco
 
 # run in container
 $ # the container parameters and environments could be found from hack/yaml/caelus.json, such as:
-$ docker run -it --cap-add SYS_ADMIN --cap-add NET_ADMIN --cap-add MKNOD --cap-add SYS_PTRACE --cap-add SYS_CHROOT --cap-add SYS_NICE -v /:/rootfs -v /sys:/sys -v /dev/disk:/dev/disk xxxx /bin/bash
+$ docker run -it --cap-add SYS_ADMIN --cap-add NET_ADMIN --cap-add MKNOD --cap-add SYS_PTRACE --cap-add SYS_CHROOT --cap-add SYS_NICE -v /:/rootfs -v /sys:/sys -v /dev/disk:/dev/disk ccr.ccs.tencentyun.com/caelus/caelus:v1.0.0 /bin/bash
 
 # running on K8S
 $ kubectl create -f hack/yaml/caelus.yaml
