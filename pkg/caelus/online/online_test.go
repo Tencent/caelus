@@ -16,58 +16,42 @@
 package online
 
 import (
+	"os"
+	"path"
 	"regexp"
 	"testing"
 
 	"github.com/tencent/caelus/pkg/caelus/statestore"
 	"github.com/tencent/caelus/pkg/caelus/statestore/mock"
 	"github.com/tencent/caelus/pkg/caelus/types"
+	"github.com/tencent/caelus/pkg/caelus/util/cgroup"
+
+	"github.com/opencontainers/runc/libcontainer/cgroups"
 )
 
 type onlineTestData struct {
 	describe       string
+	fixed          bool
 	config         types.OnlineConfig
 	expectExtraCgs []string
 	expectSpec     map[string]*jobSpec
 }
 
+var (
+	cgroupTestPath = "/testing"
+)
+
 // TestGenerateOnlineCgroups tests generate online cgroups cases
 func TestGenerateOnlineCgroups(t *testing.T) {
 	onlineTestCases := []onlineTestData{
 		{
-			describe: "system service",
+			describe: "non fixed cgroup",
+			fixed:    false,
 			config: types.OnlineConfig{
 				Jobs: []types.OnlineJobConfig{
 					{
-						Name:    "journal",
-						Command: "systemd-journald",
-					},
-				},
-				PidToCgroup: types.PidToCgroup{
-					BatchNum: 10,
-				},
-			},
-			expectExtraCgs: []string{
-				"/system.slice/systemd-journald.service",
-			},
-			expectSpec: map[string]*jobSpec{
-				"journal": {
-					cgroups: map[string]*cgroupSpec{
-						"/system.slice/systemd-journald.service": {
-							fixed:  true,
-							pidNum: -1,
-						},
-					},
-				},
-			},
-		},
-		{
-			describe: "daemon process service",
-			config: types.OnlineConfig{
-				Jobs: []types.OnlineJobConfig{
-					{
-						Name:    "testing",
-						Command: "go test -v -count=1",
+						Name:    "nonFixedCgroup",
+						Command: "go test",
 					},
 				},
 				PidToCgroup: types.PidToCgroup{
@@ -78,9 +62,9 @@ func TestGenerateOnlineCgroups(t *testing.T) {
 				"/onlinejobs",
 			},
 			expectSpec: map[string]*jobSpec{
-				"testing": {
+				"nonFixedCgroup": {
 					cgroups: map[string]*cgroupSpec{
-						"/onlinejobs/testing": {
+						"/onlinejobs/nonFixedCgroup": {
 							fixed:  false,
 							pidNum: -1,
 						},
@@ -89,12 +73,41 @@ func TestGenerateOnlineCgroups(t *testing.T) {
 			},
 		},
 		{
-			describe: "signal pid number match",
+			describe: "fixed cgroup",
+			fixed:    true,
 			config: types.OnlineConfig{
 				Jobs: []types.OnlineJobConfig{
 					{
-						Name:    "journal",
-						Command: "systemd-journald",
+						Name:    "fixedCgroup",
+						Command: "go test",
+					},
+				},
+				PidToCgroup: types.PidToCgroup{
+					BatchNum: 10,
+				},
+			},
+			expectExtraCgs: []string{
+				cgroupTestPath,
+			},
+			expectSpec: map[string]*jobSpec{
+				"fixedCgroup": {
+					cgroups: map[string]*cgroupSpec{
+						cgroupTestPath: {
+							fixed:  true,
+							pidNum: -1,
+						},
+					},
+				},
+			},
+		},
+		{
+			describe: "signal pid number match",
+			fixed:    true,
+			config: types.OnlineConfig{
+				Jobs: []types.OnlineJobConfig{
+					{
+						Name:    "fixedCgroup",
+						Command: "go test",
 					},
 				},
 				PidToCgroup: types.PidToCgroup{
@@ -102,12 +115,12 @@ func TestGenerateOnlineCgroups(t *testing.T) {
 				},
 			},
 			expectExtraCgs: []string{
-				"/system.slice/systemd-journald.service",
+				cgroupTestPath,
 			},
 			expectSpec: map[string]*jobSpec{
-				"journal": {
+				"fixedCgroup": {
 					cgroups: map[string]*cgroupSpec{
-						"/system.slice/systemd-journald.service": {
+						cgroupTestPath: {
 							fixed:  true,
 							pidNum: -1,
 						},
@@ -117,7 +130,37 @@ func TestGenerateOnlineCgroups(t *testing.T) {
 		},
 	}
 
+	// the parent process is "go test"
+	currentPid := os.Getppid()
+	err := cgroup.EnsureCgroupPath(cgroupTestPath)
+	if err != nil {
+		t.Fatalf("online test failed for mkdir cgroup err: %v", err)
+	}
+	err = cgroup.EnsureCpuSetCores(cgroupTestPath)
+	if err != nil {
+		t.Fatalf("online test failed for set cpuset err: %v", err)
+	}
+	defer func() {
+		cgs, _ := cgroups.GetAllSubsystems()
+		rootPath := cgroup.GetRoot()
+		for _, cg := range cgs {
+			os.RemoveAll(path.Join(rootPath, cg, cgroupTestPath))
+		}
+	}()
+	// no need to check the error, for the above EnsureCgroupPath has passed
+	subsystems, _ := cgroups.GetAllSubsystems()
+
 	for _, oCase := range onlineTestCases {
+		if oCase.fixed {
+			err = cgroup.MoveSpecificPids(subsystems, []int{currentPid}, cgroupTestPath)
+		} else {
+			err = cgroup.MoveSpecificPids(subsystems, []int{currentPid}, "/")
+		}
+		if err != nil {
+			t.Logf("online test case %s move pids err: %v, just skip the case", oCase.describe, err)
+			continue
+		}
+
 		cgSt := &mock.MockCgroupStore{}
 		st := mock.NewMockStatStore(nil, cgSt)
 		onManager := mockOnlineManager(oCase.config, st)

@@ -19,8 +19,10 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/tencent/caelus/pkg/caelus/statestore"
@@ -347,12 +349,30 @@ func moveOnlinePidList(cgPath string, pids []int, subSystem []string) {
 	}
 }
 
-// getMachinePidList get pid list from cpuset root cgroup
+// getMachinePidList get pid list from /proc
 func getMachinePidList() []int {
-	pids, err := cgroup.GetFreezerPids("")
+	d, err := os.Open("/proc")
 	if err != nil {
-		klog.Fatalf("get cpuset root path pids err: %v", err)
+		klog.Fatalf("opem /proc err: %v", err)
 	}
+	defer d.Close()
+
+	procs, err := d.Readdirnames(-1)
+	if err != nil {
+		klog.Fatalf("read /proc err: %v", err)
+	}
+
+	var pids []int
+	for _, pStr := range procs {
+		// just select the number
+		if pStr[0] < '0' || pStr[0] > '9' {
+			continue
+		}
+		if p, err := strconv.ParseUint(pStr, 10, 64); err == nil {
+			pids = append(pids, int(p))
+		}
+	}
+
 	return pids
 }
 
