@@ -66,7 +66,7 @@ type YarnMetrics struct {
 }
 
 // NewYarnMetrics create a yarnMetrics instance
-func NewYarnMetrics(metricsPort int, metricsPortChan chan int) *YarnMetrics {
+func NewYarnMetrics(metricsPort *int, metricsPortChan chan int) *YarnMetrics {
 	m := &YarnMetrics{
 		nodeName: util.NodeIP(),
 		containerStatusDesc: prometheus.NewDesc("caelus_yarn_nm_container", "nodemanager containers status",
@@ -78,7 +78,10 @@ func NewYarnMetrics(metricsPort int, metricsPortChan chan int) *YarnMetrics {
 		lastWarning:     time.Now().Add(-warningPeriod),
 		failedCount:     0,
 	}
-	m.resetMetricUrl(metricsPort)
+
+	if metricsPort != nil {
+		m.resetMetricUrl(*metricsPort)
+	}
 	return m
 }
 

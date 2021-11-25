@@ -65,9 +65,11 @@ func newYarnClient(config types.NodeResourceConfig, predictor predict.Interface,
 	diskManager := yarn.NewDiskManager(config.YarnConfig.Disks, yarnData.Client)
 	ginit := yarn.NewGInit(config.DisableKillIfNormal, config.OnlyKillIfIncompressibleRes,
 		config.YarnConfig, diskManager)
+
+	// initialize metrics port
 	nmPort, err := ginit.GetNMWebappPort()
 	if err != nil {
-		klog.Errorf("get nodemanager web port failed, using default value(%d): %v", err, nmPort)
+		klog.Errorf("get nodemanager web port failed:%v", err)
 	}
 
 	// initialize resource adapter, which must be in order
