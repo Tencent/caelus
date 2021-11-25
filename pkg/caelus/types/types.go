@@ -219,17 +219,19 @@ type SilenceConfig struct {
 // YarnNodeResourceConfig is used to show yarn related configuration
 type YarnNodeResourceConfig struct {
 	// CapacityIncInterval is used to make nodemanager capacity increase not very frequently
-	CapacityIncInterval times.Duration    `json:"capacity_inc_interval"`
-	NMServer            string            `json:"nm_server"`
-	NMReserve           Resource          `json:"nm_reserve"`
-	ResourceRoundOff    RoundOffResource  `json:"resource_roundoff"`
-	ResourceRange       RangeResource     `json:"resource_range"`
-	ScheduleServerPort  string            `json:"schedule_server_port"`
-	PortAutoDetect      bool              `json:"port_auto_detect"`
-	Properties          map[string]string `json:"properties"`
-	Disks               YarnDisksConfig   `json:"disks"`
-	ShimServer          string            `json:"shim_server"`
-	CpuOverCommit       OverCommit        `json:"cpu_over_commit"`
+	CapacityIncInterval times.Duration   `json:"capacity_inc_interval"`
+	NMServer            string           `json:"nm_server"`
+	NMReserve           Resource         `json:"nm_reserve"`
+	ResourceRoundOff    RoundOffResource `json:"resource_roundoff"`
+	ResourceRange       RangeResource    `json:"resource_range"`
+	ScheduleServerPort  string           `json:"schedule_server_port"`
+	PortAutoDetect      bool             `json:"port_auto_detect"`
+	// the YARN resource qos is closed with default value
+	EnableYarnQOS bool              `json:"enable_yarn_qos"`
+	Properties    map[string]string `json:"properties"`
+	Disks         YarnDisksConfig   `json:"disks"`
+	ShimServer    string            `json:"shim_server"`
+	CpuOverCommit OverCommit        `json:"cpu_over_commit"`
 }
 
 // OverCommit set overcommit percent for resource

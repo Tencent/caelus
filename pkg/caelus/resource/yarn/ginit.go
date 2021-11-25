@@ -156,21 +156,25 @@ func (g *GInit) StartNodemanager() error {
 		}
 	}
 
-	// no need to set resource limit by nodemanager, just limited by the QOS module
-	klog.V(2).Infof("disable nodemanager QOS function")
-	properties := map[string]string{
-		"yarn.nodemanager.resource.percentage-physical-cpu-limit": "100",
-		"yarn.nodemanager.resource.memory.enabled":                "false"}
-	// set extra properties from config file
-	if len(g.Properties) != 0 {
-		for k, v := range properties {
-			g.Properties[k] = v
+	if !g.EnableYarnQOS {
+		// no need to set resource limit by nodemanager, just limited by the QOS module
+		klog.V(2).Infof("disable nodemanager QOS function")
+		properties := map[string]string{
+			"yarn.nodemanager.resource.percentage-physical-cpu-limit": "100",
+			"yarn.nodemanager.resource.memory.enabled":                "false"}
+		// set extra properties from config file
+		if len(g.Properties) != 0 {
+			for k, v := range properties {
+				g.Properties[k] = v
+			}
+		} else {
+			g.Properties = properties
 		}
-	} else {
-		g.Properties = properties
 	}
-	if err := g.SetProperty(YarnSite, g.Properties, true, false); err != nil {
-		return err
+	if len(g.Properties) > 0 {
+		if err := g.SetProperty(YarnSite, g.Properties, true, false); err != nil {
+			return err
+		}
 	}
 
 	klog.V(2).Infof("starting nodemanager process")
