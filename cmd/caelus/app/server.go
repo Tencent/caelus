@@ -198,6 +198,7 @@ func (o *options) initModules(caelus *types.CaelusConfig, ctx *context.CaelusCon
 	var healthCheckManager health.Manager
 	var conflictMn conflict.Manager
 	podInformer := ctx.GetPodFactory().Core().V1().Pods().Informer()
+	checkpoint.InitCheckpointManager(caelus.CheckPoint.CheckPointDir)
 
 	// resource store
 	stStore = statestore.NewStateStoreManager(&caelus.Metrics, &caelus.Online, podInformer)
@@ -254,21 +255,13 @@ func (o *options) initModules(caelus *types.CaelusConfig, ctx *context.CaelusCon
 // generateResourceManagerData construct offline resource struct data
 func generateResourceManagerData(caelus *types.CaelusConfig, stStore statestore.StateStore,
 	podInformer cache.SharedIndexInformer, ctx *context.CaelusContext) interface{} {
-	checkpointCfg := caelus.CheckPoint
 	nodeInformer := ctx.GetNodeFactory().Core().V1().Nodes().Informer()
-
-	rsCheckpointManager, err := checkpoint.NewNodeResourceCheckpointManager(checkpointCfg.CheckPointDir,
-		checkpointCfg.NodeResourceKey)
-	if err != nil {
-		klog.Fatalf("init checkpoint fail: %v", err)
-	}
 
 	var resourceData interface{}
 	offlineOnK8sCommonData := resource.OfflineOnK8sCommonData{
-		StStore:           stStore,
-		Client:            ctx.GetKubeClient(),
-		PodInformer:       podInformer,
-		CheckpointManager: rsCheckpointManager,
+		StStore:     stStore,
+		Client:      ctx.GetKubeClient(),
+		PodInformer: podInformer,
 	}
 	if types.OfflineOnYarn(&caelus.TaskType) {
 		resourceData = &resource.OfflineYarnData{

@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/tencent/caelus/pkg/caelus/checkpoint"
 	"github.com/tencent/caelus/pkg/caelus/util"
 	"github.com/tencent/caelus/pkg/caelus/util/ports"
 
@@ -33,6 +34,8 @@ const (
 	yarnNodeManagerWebappAddress    = "yarn.nodemanager.webapp.address"
 
 	defaultWebappAddressPort = 10001
+
+	checkpointKey = "nm_ports"
 )
 
 var (
@@ -49,6 +52,7 @@ var (
 
 // ensurePort choose nodemanager port automatically
 func (g *GInit) ensurePort() error {
+	restorePortsCheckpoint()
 	startPort := 8082
 	usedPorts := sets.NewInt()
 	for _, k := range portNames {
@@ -86,6 +90,7 @@ func (g *GInit) ensurePort() error {
 		// storing the port, and will firstly check the port at next time
 		defaultPort[k] = hp.Port
 	}
+	storeCheckpoint()
 	return nil
 }
 
@@ -115,4 +120,29 @@ func (g *GInit) GetNMWebappPort() (int, error) {
 	}
 
 	return defaultWebappAddressPort, err
+}
+
+func restorePortsCheckpoint() {
+	pcp := &portsCheckpoint{}
+	err := checkpoint.Restore(checkpointKey, pcp)
+	if err != nil {
+		klog.Errorf("failed restore %s checkpoint: %v", checkpointKey, err)
+		return
+	}
+	for _, portName := range portNames {
+		if v, exist := pcp.Ports[portName]; exist && v > 0 {
+			defaultPort[portName] = v
+		}
+	}
+}
+
+func storeCheckpoint() {
+	pcp := &portsCheckpoint{Ports: defaultPort}
+	if err := checkpoint.Save(checkpointKey, pcp); err != nil {
+		klog.Errorf("failed store %s checkpoint: %v", checkpointKey, err)
+	}
+}
+
+type portsCheckpoint struct {
+	Ports map[string]int
 }

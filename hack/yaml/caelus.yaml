@@ -50,8 +50,7 @@ data:
         "kubelet_root_dir": "/var/lib/kubelet"
       },
       "check_point": {
-        "check_point_dir": "/var/run/caelus",
-        "node_resource_key": "node_resource"
+        "check_point_dir": "/var/run/caelus"
       },
       "task_type": {
         "online_type": "k8s",
