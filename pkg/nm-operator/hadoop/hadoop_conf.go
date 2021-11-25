@@ -16,15 +16,18 @@
 package hadoop
 
 import (
+	"bytes"
 	"encoding/xml"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 
 	global "github.com/tencent/caelus/pkg/types"
 
@@ -54,6 +57,13 @@ var (
 	// NodeManager capacity
 	cacheCapacity     *global.NMCapacity
 	cacheCapacityLock sync.RWMutex
+
+	fileLock sync.Mutex
+
+	fileInfos = struct {
+		sync.RWMutex
+		infos map[string]*fileInfo
+	}{infos: make(map[string]*fileInfo)}
 )
 
 // PropertyData show value of signal xml property
@@ -68,6 +78,26 @@ type PropertyData struct {
 type ConfData struct {
 	XMLName    xml.Name       `xml:"configuration"`
 	Properties []PropertyData `xml:"property"`
+}
+
+// file info, including mode\uid\gid
+type fileInfo struct {
+	mode os.FileMode
+	uid  int
+	gid  int
+}
+
+// writeWrapper wrap the io.Writer struct in case the garbled code
+type writeWrapper struct {
+	File *os.File
+}
+
+// Write replace the "&#xA;" to "\n"
+func (w writeWrapper) Write(data []byte) (n int, err error) {
+	n = len(data)
+	data = bytes.Replace(data, []byte("&#xA;"), []byte("\n"), -1)
+	_, err = w.File.Write(data)
+	return
 }
 
 // GetXMLFullPath return full path
@@ -139,55 +169,101 @@ func (conf *ConfData) SaveToStream(w io.Writer) error {
 
 // SetMultipleConfDataToFile set many properties to xml file
 func SetMultipleConfDataToFile(xmlfile string, properties map[string]string) error {
-	if len(properties) == 0 {
-		return nil
-	}
-
-	file, err := os.OpenFile(GetXMLFullPath(xmlfile), os.O_RDWR, 0666)
-	if err != nil {
-		klog.Errorf("open file error: %v", err)
-		return err
-	}
-	defer file.Close()
-
-	conf, err := LoadConfDataFromStream(file)
-	if err != nil {
-		return err
-	}
-
-	for key, value := range properties {
-		conf.Set(key, value)
-	}
-
-	file.Seek(0, os.SEEK_SET)
-	file.Truncate(0)
-	return conf.SaveToStream(file)
+	return writeConfDataToFile(xmlfile, properties, true, false, false)
 }
 
 // SetAddDelMultipleConfDataToFile set many properties to xml file, may add new key or delete old key
 func SetAddDelMultipleConfDataToFile(xmlfile string, properties map[string]string, add, del bool) error {
+	return writeConfDataToFile(xmlfile, properties, false, add, del)
+}
+
+func writeConfDataToFile(fileName string, properties map[string]string, change, add, del bool) error {
 	if len(properties) == 0 {
 		return nil
 	}
 
-	file, err := os.OpenFile(GetXMLFullPath(xmlfile), os.O_RDWR, 0666)
+	conf, err := getConfData(fileName, properties, change, add, del)
 	if err != nil {
-		klog.Errorf("open file error: %v", err)
-		return err
-	}
-	defer file.Close()
-
-	conf, err := LoadConfDataFromStream(file)
-	if err != nil {
+		klog.Errorf("get conf data err: %v", err)
 		return err
 	}
 
+	f, err := getFileInfo(GetXMLFullPath(fileName))
+	if err != nil {
+		klog.Errorf("get file(%s) info err: %v", fileName, err)
+		return err
+	}
+
+	// write config data to temporary file
+	tmpFile, err := ioutil.TempFile(filepath.Dir(GetXMLFullPath(fileName)), ".")
+	if err != nil {
+		klog.Errorf("create tmp file err: %v", err)
+		return err
+	}
+	// the remove should be failed if rename operation is successful
+	defer os.Remove(tmpFile.Name())
+
+	// copy the original file info to the tmp file
+	if err = os.Chmod(tmpFile.Name(), f.mode); err != nil {
+		klog.Errorf("chmod file(%s) to %v err: %v", tmpFile.Name(), f.mode, err)
+		return err
+	}
+	if err = os.Chown(tmpFile.Name(), f.uid, f.gid); err != nil {
+		klog.Errorf("chown file(%s) to %d:%d err: %v", tmpFile.Name(), f.uid, f.gid, err)
+		return err
+	}
+
+	// should translate to writeWrapper, or the "\n" will be translated to "&#xA"
+	err = conf.SaveToStream(writeWrapper{tmpFile})
+	if err != nil {
+		klog.Errorf("save to tmp file err: %v", err)
+		return err
+	}
+	// Sync file.
+	err = tmpFile.Sync()
+	if err != nil {
+		klog.Errorf("sync tmp file err: %v", err)
+		return err
+	}
+	// Closing the file before renaming.
+	err = tmpFile.Close()
+	if err != nil {
+		klog.Errorf("close tmp file err: %v", err)
+		return err
+	}
+
+	// rename temporary file to target file
+	err = func() error {
+		fileLock.Lock()
+		defer fileLock.Unlock()
+		return os.Rename(tmpFile.Name(), GetXMLFullPath(fileName))
+	}()
+	if err != nil {
+		klog.Errorf("rename tmp file err: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func getConfData(fileName string, properties map[string]string, change, add, del bool) (*ConfData, error) {
+	// read current config data
+	conf, err := LoadConfDataFromFile(fileName)
+	if err != nil {
+		klog.Errorf("load conf data from %s err: %v", fileName, err)
+		return nil, err
+	}
+
+	if change {
+		for key, value := range properties {
+			conf.Set(key, value)
+		}
+	}
 	if add {
 		for key, value := range properties {
 			conf.SetAdd(key, value)
 		}
 	}
-
 	if del {
 		newProperties := []PropertyData{}
 		for _, p := range conf.Properties {
@@ -198,13 +274,49 @@ func SetAddDelMultipleConfDataToFile(xmlfile string, properties map[string]strin
 		conf.Properties = newProperties
 	}
 
-	file.Seek(0, os.SEEK_SET)
-	file.Truncate(0)
-	return conf.SaveToStream(file)
+	return conf, nil
+}
+
+func getFileInfo(fileName string) (*fileInfo, error) {
+	f := func() *fileInfo {
+		fileInfos.RWMutex.RLock()
+		defer fileInfos.RWMutex.RUnlock()
+
+		if v, ok := fileInfos.infos[fileName]; ok {
+			return v
+		}
+		return nil
+	}()
+	if f != nil {
+		return f, nil
+	}
+
+	f = &fileInfo{}
+	info, err := os.Stat(fileName)
+	if err != nil {
+		return nil, err
+	}
+	f.mode = info.Mode()
+
+	if stat, ok := info.Sys().(*syscall.Stat_t); ok {
+		f.uid = int(stat.Uid)
+		f.gid = int(stat.Gid)
+	} else {
+		return nil, fmt.Errorf("uid/gid not found, may be not in linux")
+	}
+
+	fileInfos.RWMutex.Lock()
+	defer fileInfos.RWMutex.Unlock()
+	fileInfos.infos[fileName] = f
+
+	return f, nil
 }
 
 // LoadConfDataFromFile load xmf struct from file
 func LoadConfDataFromFile(filename string) (*ConfData, error) {
+	fileLock.Lock()
+	defer fileLock.Unlock()
+
 	file, err := os.Open(GetXMLFullPath(filename))
 	if err != nil {
 		return nil, err
@@ -221,14 +333,9 @@ func LoadConfDataFromFile(filename string) (*ConfData, error) {
 // GetConfDataFromFile get key value from file
 // @xmlfile: yarn-site.xml, core-site.xml, hdfs-site.xml
 func GetConfDataFromFile(xmlfile string, key string) string {
-	file, err := os.Open(GetXMLFullPath(xmlfile))
-	if err != nil {
-		return ""
-	}
-	defer file.Close()
-
-	conf, err := LoadConfDataFromStream(file)
-	if err != nil {
+	conf, err := LoadConfDataFromFile(xmlfile)
+	if err != nil || conf == nil {
+		klog.Errorf("load conf data from file(%s) err: %v", xmlfile, err)
 		return ""
 	}
 
