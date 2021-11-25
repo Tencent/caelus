@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/tencent/caelus/pkg/caelus/alarm"
-	"github.com/tencent/caelus/pkg/caelus/checkpoint"
 	"github.com/tencent/caelus/pkg/caelus/healthcheck/conflict"
 	"github.com/tencent/caelus/pkg/caelus/metrics"
 	"github.com/tencent/caelus/pkg/caelus/predict"
@@ -46,11 +45,9 @@ type OfflineYarnData struct {
 // yarnClient group node resource manager for yarn
 type yarnClient struct {
 	types.NodeResourceConfig
-	predictor predict.Interface
-	// checkpointManager
-	checkpointManager *checkpoint.NodeResourceCheckpointManager
-	scheduleDisabled  bool
-	scheduleLock      sync.RWMutex
+	predictor        predict.Interface
+	scheduleDisabled bool
+	scheduleLock     sync.RWMutex
 	// nodemanager operation client
 	ginit               yarn.GInitInterface
 	conflict            conflict.Manager
@@ -89,7 +86,6 @@ func newYarnClient(config types.NodeResourceConfig, predictor predict.Interface,
 		ginit:              ginit,
 		conflict:           conflict,
 		metrics:            yarn.NewYarnMetrics(nmPort, ginit.WatchForMetricsPort()),
-		checkpointManager:  yarnData.CheckpointManager,
 		// the initialized timestamp ensure the first checking
 		lastCapIncTimestamp: time.Now().Add(-config.YarnConfig.CapacityIncInterval.TimeDuration()),
 		resourceHandlers:    resourceHandlers,
@@ -110,7 +106,7 @@ func (y *yarnClient) CheckPoint() error {
 	metrics.NodeScheduleDisabled(0)
 	// for yarn, we need to notify master to enable schedule again if the check point is in disabled state,
 	// so setting checkTime as false.
-	checkScheduleDisable(y.checkpointManager, false, y.EnableOfflineSchedule, y.DisableOfflineSchedule)
+	checkScheduleDisable(false, y.EnableOfflineSchedule, y.DisableOfflineSchedule)
 
 	return nil
 }
@@ -151,7 +147,7 @@ func (y *yarnClient) DisableOfflineSchedule() error {
 	}
 	y.scheduleDisabled = true
 	metrics.NodeScheduleDisabled(1)
-	storeCheckpoint(y.checkpointManager, true)
+	storeCheckpoint(true)
 
 	return nil
 }
@@ -173,8 +169,7 @@ func (y *yarnClient) EnableOfflineSchedule() error {
 	}
 	metrics.NodeScheduleDisabled(0)
 	y.scheduleDisabled = false
-	storeCheckpoint(y.checkpointManager, false)
-
+	storeCheckpoint(false)
 	return nil
 }
 

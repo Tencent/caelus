@@ -101,7 +101,7 @@ func (k *k8sClient) Init() error {
 func (k *k8sClient) CheckPoint() error {
 	metrics.NodeScheduleDisabled(0)
 	// for k8s, disable schedule action is done by native agent, and could check time available
-	checkScheduleDisable(k.CheckpointManager, true, k.EnableOfflineSchedule, k.DisableOfflineSchedule)
+	checkScheduleDisable(true, k.EnableOfflineSchedule, k.DisableOfflineSchedule)
 
 	return nil
 }
@@ -249,7 +249,7 @@ func (k *k8sClient) DisableOfflineSchedule() error {
 	klog.V(2).Infof("schedule is closing")
 	k.extResScheduleDisabled = true
 	metrics.NodeScheduleDisabled(1)
-	storeCheckpoint(k.CheckpointManager, true)
+	storeCheckpoint(true)
 
 	return nil
 }
@@ -266,7 +266,7 @@ func (k *k8sClient) EnableOfflineSchedule() error {
 	klog.V(2).Infof("schedule is opening")
 	k.extResScheduleDisabled = false
 	metrics.NodeScheduleDisabled(0)
-	storeCheckpoint(k.CheckpointManager, false)
+	storeCheckpoint(false)
 
 	return nil
 }

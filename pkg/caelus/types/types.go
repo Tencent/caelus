@@ -180,8 +180,7 @@ type K8sConfig struct {
 
 // CheckPointConfig group info related to check point, which saving state to local file
 type CheckPointConfig struct {
-	CheckPointDir   string `json:"check_point_dir"`
-	NodeResourceKey string `json:"node_resource_key"`
+	CheckPointDir string `json:"check_point_dir"`
 }
 
 // TaskTypeConfig show the online and offline task type,
@@ -540,9 +539,6 @@ func initJsonConfig(caelus *CaelusConfig) error {
 func initCheckPointConfig(config *CheckPointConfig) {
 	if len(config.CheckPointDir) == 0 {
 		config.CheckPointDir = defaultCheckPointDir
-	}
-	if len(config.NodeResourceKey) == 0 {
-		config.NodeResourceKey = defaultNodeResourceCheckPointKey
 	}
 }
 

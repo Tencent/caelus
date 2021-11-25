@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/tencent/caelus/pkg/caelus/checkpoint"
 	"github.com/tencent/caelus/pkg/caelus/healthcheck/conflict"
 	"github.com/tencent/caelus/pkg/caelus/metrics"
 	"github.com/tencent/caelus/pkg/caelus/predict"
@@ -62,8 +61,6 @@ type OfflineOnK8sCommonData struct {
 	Client kubernetes.Interface
 	// pod informer
 	PodInformer cache.SharedIndexInformer
-	// checkpointManager
-	CheckpointManager *checkpoint.NodeResourceCheckpointManager
 }
 
 // NewOfflineOnK8sManager new an instance for node resource manager

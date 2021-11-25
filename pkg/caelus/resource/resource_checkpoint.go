@@ -25,14 +25,21 @@ import (
 const (
 	timeAvailableSeconds    = 300
 	disableScheduleDuration = time.Duration(5 * time.Minute)
+	checkpointKey           = "node_resource"
 )
+
+// NodeResourceCheckPoint struct is used to store schedule state in a checkpoint
+type NodeResourceCheckPoint struct {
+	Timeseconds     int64
+	ScheduleDisable bool
+}
 
 // checkScheduleDisable will check schedule state from local check point file when agent restarted,
 // if the schedule is disabled, this will set schedule disable again and enable in future time.
-func checkScheduleDisable(checkpointManager *checkpoint.NodeResourceCheckpointManager, checkTime bool,
+func checkScheduleDisable(checkTime bool,
 	enableSchedule, disableSchedule func() error) error {
-
-	nodeCheckpoint, err := checkpointManager.RestoreNodeResourceCheckpoint()
+	nodeCheckpoint := &NodeResourceCheckPoint{}
+	err := checkpoint.Restore(checkpointKey, nodeCheckpoint)
 	if err != nil {
 		klog.Errorf("restore node resource check point err: %v", err)
 		return err
@@ -57,12 +64,11 @@ func checkScheduleDisable(checkpointManager *checkpoint.NodeResourceCheckpointMa
 }
 
 // storeCheckpoint store schedule state into checkout point file
-func storeCheckpoint(checkpointManager *checkpoint.NodeResourceCheckpointManager,
-	scheduleState bool) error {
-	nodeCheckPoint := &checkpoint.NodeResourceCheckPoint{
+func storeCheckpoint(scheduleState bool) error {
+	nodeCheckPoint := &NodeResourceCheckPoint{
 		ScheduleDisable: scheduleState,
 		Timeseconds:     time.Now().Unix(),
 	}
 
-	return checkpointManager.StoreNodeResourceCheckpoint(nodeCheckPoint)
+	return checkpoint.Save(checkpointKey, nodeCheckPoint)
 }
