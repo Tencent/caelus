@@ -32,6 +32,8 @@ type commonResourceInterface interface {
 	DisableOfflineSchedule() error
 	// EnableOfflineSchedule enable schedule
 	EnableOfflineSchedule() error
+	// OfflineScheduleDisabled return true if schedule disabled for offline jobs
+	OfflineScheduleDisabled() bool
 	// GetOfflineJobs return current offline job list
 	GetOfflineJobs() ([]types.OfflineJobs, error)
 	// KillOfflineJob kill offline job based on conflicting resource

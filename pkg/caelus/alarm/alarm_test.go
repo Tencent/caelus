@@ -141,7 +141,7 @@ func TestSendAlarm(t *testing.T) {
 		// just set silence mode equal to alarm ignored value
 		util.SilenceMode = ac.alarmConfig.IgnoreAlarmWhenSilence
 
-		am := NewManager(&ac.alarmConfig)
+		am := NewManager(&ac.alarmConfig, nil)
 		stopCh := make(chan struct{})
 		am.Run(stopCh)
 

@@ -206,9 +206,6 @@ func (o *options) initModules(caelus *types.CaelusConfig, ctx *context.CaelusCon
 	o.ApiOption.loadStatsMetric(metrics.StatsMetricStore, stStore)
 	// conflict manager
 	conflictMn = conflict.NewConflictManager()
-	// alarm manager
-	alarmManager = alarm.NewManager(&caelus.Alarm)
-	modules = append(modules, alarmManager)
 	// predict manager
 	predictor = predict.NewPredictorOrDie(caelus.Predicts, stStore)
 	modules = append(modules, predictor)
@@ -219,6 +216,9 @@ func (o *options) initModules(caelus *types.CaelusConfig, ctx *context.CaelusCon
 		o.ApiOption.prometheusRegistry.MustRegister(resourceManager)
 		modules = append(modules, resourceManager)
 	}
+	// alarm manager
+	alarmManager = alarm.NewManager(&caelus.Alarm, resourceManager)
+	modules = append(modules, alarmManager)
 	// online jobs manager
 	if caelus.Online.Enable {
 		onlineManager = online.NewOnlineManager(caelus.Online, stStore)
