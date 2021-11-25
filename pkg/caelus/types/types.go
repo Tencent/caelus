@@ -146,6 +146,16 @@ type Resource struct {
 	MemPercent    *float64 `json:"-"`
 }
 
+// DiskPartitionStats show disk space size
+type DiskPartitionStats struct {
+	// TotalSize show total disk size in bytes
+	TotalSize int64
+	// UsedSize show used disk size in bytes
+	UsedSize int64
+	// FreeSize show free disk size in bytes
+	FreeSize int64
+}
+
 // CaelusConfig is the configuration for Caelus
 type CaelusConfig struct {
 	K8sConfig    K8sConfig          `json:"k8s_config"`
