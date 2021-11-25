@@ -49,6 +49,7 @@ var (
 	metricNameNodeScheduleDisabled = "scheduleDisabled"
 	metricsNameSLONotMetCounter    = "sloNotMetCounter"
 	metricsNameOnlineJob           = "onlineJob"
+	metricsDiskSpace               = "diskSpace"
 
 	totalMetrics = map[string]prometheus.Collector{
 		// InterferenceCounter is the interference count
@@ -86,6 +87,10 @@ var (
 			Name: "caelus_online_job",
 			Help: "caelus online jobs metrics and slo value",
 		}, []string{"node", "jobname", "metrics"}),
+		metricsDiskSpace: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "caelus_disk_space_gb",
+			Help: "caelus node disk space",
+		}, []string{"node", "type", "mountpoint"}),
 	}
 )
 
@@ -141,5 +146,15 @@ func OnlineJobsMetrics(jobName string, metrics map[string]float64) {
 	onlineJobsMetrics := totalMetrics[metricsNameOnlineJob].(*prometheus.GaugeVec)
 	for k, v := range metrics {
 		onlineJobsMetrics.WithLabelValues(nodeName, jobName, k).Set(v)
+	}
+}
+
+// DiskSpaceMetrics record disk space metrics data
+func DiskSpaceMetrics(diskStats map[string]*types.DiskPartitionStats) {
+	nodeName := util.NodeIP()
+	diskSpaceMetric := totalMetrics[metricsDiskSpace].(*prometheus.GaugeVec)
+	for mountpoint, stat := range diskStats {
+		diskSpaceMetric.WithLabelValues(nodeName, "total", mountpoint).Set(float64(stat.TotalSize / types.DiskUnit))
+		diskSpaceMetric.WithLabelValues(nodeName, "free", mountpoint).Set(float64(stat.FreeSize / types.DiskUnit))
 	}
 }

@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/tencent/caelus/pkg/caelus/alarm"
+	"github.com/tencent/caelus/pkg/caelus/metrics"
 	"github.com/tencent/caelus/pkg/caelus/types"
 	"github.com/tencent/caelus/pkg/caelus/util"
 
@@ -72,16 +73,6 @@ type PartitionInfo struct {
 	// LogPath log path for nodemanager on this partition
 	LogPath   string
 	TotalSize int64
-}
-
-// DiskPartitionStats show disk space size
-type DiskPartitionStats struct {
-	// TotalSize show total disk size in bytes
-	TotalSize int64
-	// UsedSize show used disk size in bytes
-	UsedSize int64
-	// FreeSize show free disk size in bytes
-	FreeSize int64
 }
 
 // NewDiskManager create a new disk manager instance
@@ -203,12 +194,14 @@ func (d *DiskManager) getClearPaths() (restartNMPod bool, clearPaths map[string]
 	clearPaths = make(map[string]int64)
 
 	dataIsFull := false
+	diskSpaceStat := make(map[string]*types.DiskPartitionStats)
 	for _, p := range d.availablePartitions {
 		pStat, err := getDiskPartitionStats(p.MountPoint)
 		if err != nil {
 			klog.Errorf("get partition state(%v) failed: %v", p, err)
 			continue
 		}
+		diskSpaceStat[p.MountPoint] = pStat
 
 		freeGb := pStat.FreeSize / types.DiskUnit
 
@@ -220,6 +213,7 @@ func (d *DiskManager) getClearPaths() (restartNMPod bool, clearPaths map[string]
 		}
 
 	}
+	metrics.DiskSpaceMetrics(diskSpaceStat)
 	// no paths need to clear, just return
 	if len(clearPaths) == 0 {
 		return
@@ -459,7 +453,7 @@ func getDiskPartitions(regexPattern string) ([]string, error) {
 }
 
 // getDiskPartitionStats output disk space stats for the partition
-func getDiskPartitionStats(partitionName string) (*DiskPartitionStats, error) {
+func getDiskPartitionStats(partitionName string) (*types.DiskPartitionStats, error) {
 	stat := syscall.Statfs_t{}
 
 	err := syscall.Statfs(partitionName, &stat)
@@ -467,7 +461,7 @@ func getDiskPartitionStats(partitionName string) (*DiskPartitionStats, error) {
 		return nil, err
 	}
 
-	dStats := &DiskPartitionStats{
+	dStats := &types.DiskPartitionStats{
 		TotalSize: int64(stat.Blocks) * stat.Bsize,
 		FreeSize:  int64(stat.Bfree) * stat.Bsize,
 	}
