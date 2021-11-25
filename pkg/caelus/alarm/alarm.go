@@ -174,7 +174,7 @@ func (a *Manager) delaySend() {
 		Cluster:  a.Cluster,
 		AlarmMsg: a.alarms.messages,
 	}
-	klog.Infof("delay sending alarms: %v", body.AlarmMsg)
+	klog.V(4).Infof("delay sending alarms: %v", body.AlarmMsg)
 	go a.send.sendMessage(body)
 	a.alarms.messages = []string{}
 }
