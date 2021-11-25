@@ -34,17 +34,35 @@ var alarmManager *Manager
 
 // SendAlarm is global function to receive alarm message
 func SendAlarm(msg string) {
-	if alarmManager == nil || !alarmManager.Enable {
-		return
-	}
+	go func() {
+		if alarmManager == nil || !alarmManager.Enable {
+			return
+		}
+		if alarmManager.ojg != nil && alarmManager.ojg.OfflineScheduleDisabled() {
+			jobs, err := alarmManager.ojg.GetOfflineJobs()
+			if err != nil {
+				klog.Errorf("failed get offline jobs: %v", err)
+			} else if len(jobs) == 0 {
+				// omit alarm message if schedule disabled and no offline job is running
+				return
+			}
+		}
 
-	klog.V(4).Infof("receiving alarm: %s", msg)
-	msg = fmt.Sprintf("%s[%s]", msg, time.Now().Format("2006-01-02 15:04:05"))
-	select {
-	case alarmManager.msgBuffers <- msg:
-	default:
-		klog.Errorf("alarm channel is full, dropping msg: %s", msg)
-	}
+		klog.V(4).Infof("receiving alarm: %s", msg)
+		msg = fmt.Sprintf("%s[%s]", msg, time.Now().Format("2006-01-02 15:04:05"))
+		select {
+		case alarmManager.msgBuffers <- msg:
+		default:
+			klog.Errorf("alarm channel is full, dropping msg: %s", msg)
+		}
+	}()
+}
+
+type offlineJobGetter interface {
+	// GetOfflineJobs return current offline job list
+	GetOfflineJobs() ([]types.OfflineJobs, error)
+	// OfflineScheduleDisabled return true if schedule disabled for offline jobs
+	OfflineScheduleDisabled() bool
 }
 
 // Manager is used to send alarm message
@@ -59,10 +77,11 @@ type Manager struct {
 	msgBuffers chan string
 	// different sending channel
 	send sendChannel
+	ojg  offlineJobGetter
 }
 
 // NewManager returns an instance of alarm manager
-func NewManager(cfg *types.AlarmConfig) *Manager {
+func NewManager(cfg *types.AlarmConfig, ojg offlineJobGetter) *Manager {
 	alarmManager = &Manager{
 		AlarmConfig: *cfg,
 		localIP:     util.NodeIP(),
@@ -72,6 +91,7 @@ func NewManager(cfg *types.AlarmConfig) *Manager {
 		}{messages: []string{}},
 
 		msgBuffers: make(chan string, 100),
+		ojg:        ojg,
 	}
 
 	if alarmManager.Enable {

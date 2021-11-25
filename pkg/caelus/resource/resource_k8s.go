@@ -271,6 +271,13 @@ func (k *k8sClient) EnableOfflineSchedule() error {
 	return nil
 }
 
+// OfflineScheduleDisabled return true if schedule disabled for offline jobs
+func (k *k8sClient) OfflineScheduleDisabled() bool {
+	k.extResScheduleLock.Lock()
+	defer k.extResScheduleLock.Unlock()
+	return k.extResScheduleDisabled
+}
+
 // GetOfflineJobs return current offline job list
 func (k *k8sClient) GetOfflineJobs() ([]types.OfflineJobs, error) {
 	offlineJobs := []types.OfflineJobs{}

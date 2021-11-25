@@ -178,6 +178,13 @@ func (y *yarnClient) EnableOfflineSchedule() error {
 	return nil
 }
 
+// OfflineScheduleDisabled return true if schedule disabled for offline jobs
+func (y *yarnClient) OfflineScheduleDisabled() bool {
+	y.scheduleLock.Lock()
+	defer y.scheduleLock.Unlock()
+	return y.scheduleDisabled
+}
+
 // KillOfflineJob kill yarn container based on conflicting resource
 func (y *yarnClient) KillOfflineJob(conflictingResource v1.ResourceName) {
 	y.ginit.KillContainer(conflictingResource)

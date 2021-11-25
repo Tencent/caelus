@@ -194,6 +194,11 @@ func (m *offlineOnK8sManager) EnableOfflineSchedule() error {
 	return m.client.EnableOfflineSchedule()
 }
 
+// OfflineScheduleDisabled return true if schedule disabled for offline jobs
+func (m *offlineOnK8sManager) OfflineScheduleDisabled() bool {
+	return m.client.OfflineScheduleDisabled()
+}
+
 // SyncNodeResource receive event to update offline resource capacity timely
 func (m *offlineOnK8sManager) SyncNodeResource(event *types.ResourceUpdateEvent) error {
 	select {

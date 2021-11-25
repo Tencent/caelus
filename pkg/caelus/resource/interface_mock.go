@@ -55,6 +55,11 @@ func (m *MockResource) EnableOfflineSchedule() error {
 	return nil
 }
 
+// OfflineScheduleDisabled return true if schedule disabled for offline jobs
+func (m *MockResource) OfflineScheduleDisabled() bool {
+	return m.ScheduledDisabled
+}
+
 // GetOfflineJobs mock function
 func (m *MockResource) GetOfflineJobs() ([]types.OfflineJobs, error) {
 	panic("implementing me")
