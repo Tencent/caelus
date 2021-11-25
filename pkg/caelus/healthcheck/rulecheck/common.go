@@ -296,6 +296,10 @@ func checkRule(checker *ruleCheckEntry, metricsValuesFunc metricsValuesFunc, now
 			reason = fmt.Sprintf("%s recover detect ABNORMAL", checker.name)
 			actions = recoverActions
 			actionsAnomaly = recoverActionsAnomaly
+		} else if len(checker.recoverRules) > 0 {
+			// if recover rule not match, it means we can't do recover actions
+			actions = nil
+			actionsAnomaly = nil
 		}
 	}
 

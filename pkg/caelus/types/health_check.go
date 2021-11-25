@@ -214,15 +214,15 @@ func ruleCheckAvailable(ruleCheck *RuleCheckConfig, nodeMetrics *MetricsNodeConf
 	}
 
 	for _, detectAc := range ruleCheck.Rules {
-		detectActionAvailable(ruleCheck, detectAc, nodeMetrics, predictReserve)
+		detectActionAvailable(ruleCheck, detectAc, nodeMetrics, predictReserve, false)
 	}
 	for _, detectAc := range ruleCheck.RecoverRules {
-		detectActionAvailable(ruleCheck, detectAc, nodeMetrics, predictReserve)
+		detectActionAvailable(ruleCheck, detectAc, nodeMetrics, predictReserve, true)
 	}
 }
 
 func detectActionAvailable(ruleCheck *RuleCheckConfig, detectAction *DetectActionConfig,
-	nodeMetrics *MetricsNodeConfig, predictReserve *Resource) {
+	nodeMetrics *MetricsNodeConfig, predictReserve *Resource, recoveryRule bool) {
 	for _, detector := range detectAction.Detects {
 		switch detector.Name {
 		case DetectionEWMA:
@@ -247,13 +247,13 @@ func detectActionAvailable(ruleCheck *RuleCheckConfig, detectAction *DetectActio
 			}
 			detector.Args = args
 
-			initExpressionEvaluate(ruleCheck, detector, nodeMetrics, predictReserve)
+			initExpressionEvaluate(ruleCheck, detector, nodeMetrics, predictReserve, recoveryRule)
 		}
 	}
 }
 
 func initExpressionEvaluate(ruleCheck *RuleCheckConfig, detector *DetectConfig, nodeMetrics *MetricsNodeConfig,
-	predictReserve *Resource) {
+	predictReserve *Resource, recoveryRule bool) {
 	args := detector.Args.(*ExpressionArgs)
 	total, _ := machine.GetTotalResource()
 	switch ruleCheck.Name {
@@ -267,7 +267,11 @@ func initExpressionEvaluate(ruleCheck *RuleCheckConfig, detector *DetectConfig, 
 			if cpuUsage < 0.85 {
 				cpuUsage += 0.05
 			}
-			args.Expression = fmt.Sprintf("%s > %f", metric, cpuUsage)
+			if recoveryRule {
+				args.Expression = fmt.Sprintf("%s < %f", metric, cpuUsage-0.05)
+			} else {
+				args.Expression = fmt.Sprintf("%s > %f", metric, cpuUsage)
+			}
 			klog.V(2).Infof("cpu monitor expression auto detected: %s", args.Expression)
 		}
 	case ruleNameMemmory:
@@ -276,7 +280,11 @@ func initExpressionEvaluate(ruleCheck *RuleCheckConfig, detector *DetectConfig, 
 			metric := ruleCheck.Metrics[0]
 			memReserve := *predictReserve.MemMB
 			memAvailable := memReserve*float64(MemUnit) - float64(1024*MemUnit)
-			args.Expression = fmt.Sprintf("%s < %f", metric, memAvailable)
+			if recoveryRule {
+				args.Expression = fmt.Sprintf("%s > %f", metric, memAvailable+float64(1024*MemUnit))
+			} else {
+				args.Expression = fmt.Sprintf("%s < %f", metric, memAvailable)
+			}
 			klog.V(2).Infof("memory monitor expression auto detected: %s", args.Expression)
 		}
 	case ruleNameDiskIO:
