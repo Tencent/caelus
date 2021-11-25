@@ -112,7 +112,7 @@ func (d *DiskManager) DiskSpaceToCores() (*resource.Quantity, error) {
 		totalSize += p.TotalSize
 	}
 
-	cores := int64(float64(totalSize)/float64(d.RatioToCore*types.DiskUnit) + 0.5)
+	cores := int64(float64(totalSize)/float64(*d.RatioToCore*types.DiskUnit) + 0.5)
 	diskSpaceCores = resource.NewMilliQuantity(cores*types.CpuUnit, resource.DecimalSI)
 
 	return diskSpaceCores, nil

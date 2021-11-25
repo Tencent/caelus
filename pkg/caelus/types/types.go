@@ -46,10 +46,8 @@ const (
 	OfflineTypeOnk8s     = "k8s"
 	OfflineTypeYarnOnk8s = "yarn_on_k8s"
 
-	defaultYarnScheduleServerPort    = "10010"
-	defaultCheckPointDir             = "/tmp/caeclus"
-	defaultNodeResourceCheckPointKey = "node_resource"
-	defaultDisksToCore               = 10
+	defaultYarnScheduleServerPort = "10010"
+	defaultCheckPointDir          = "/tmp/caeclus"
 	// defaultMinDiskCapacity is nm local-dirs min capacity(unit: Gb).
 	defaultMinDiskCapacity = 100
 
@@ -250,8 +248,8 @@ type TimeRangeOverCommit struct {
 // YarnDisksConfig group disks config
 type YarnDisksConfig struct {
 	// RatioToCore translate disk space to core numbers
-	RatioToCore      int64 `json:"ratio_to_core"`
-	MultiDiskDisable bool  `json:"multi_disk_disable"`
+	RatioToCore      *int64 `json:"ratio_to_core"`
+	MultiDiskDisable bool   `json:"multi_disk_disable"`
 	// DiskMinCapacityGb drop disks with little disk space
 	DiskMinCapacityGb int64          `json:"disk_min_capacity_gb"`
 	SpaceCheckEnabled bool           `json:"space_check_enabled"`
@@ -585,8 +583,8 @@ func initNodeResourceConfig(config *NodeResourceConfig, taskType *TaskTypeConfig
 		}
 	}
 
-	if config.YarnConfig.Disks.RatioToCore == 0 {
-		config.YarnConfig.Disks.RatioToCore = defaultDisksToCore
+	if config.YarnConfig.Disks.RatioToCore != nil && *(config.YarnConfig.Disks.RatioToCore) == 0 {
+		klog.Fatalf("disk ratio to core could not be zero")
 	}
 
 	if config.YarnConfig.Disks.DiskMinCapacityGb == 0 {

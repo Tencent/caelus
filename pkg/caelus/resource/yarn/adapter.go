@@ -167,6 +167,10 @@ func NewDiskCpuAdapter(disk *DiskManager, ginit GInitInterface) ResourceAdapter 
 
 // ResourceAdapt choose the little one between offline cores and disk space
 func (d *diskCpuAdapter) ResourceAdapt(resList v1.ResourceList) bool {
+	if d.disk.RatioToCore == nil {
+		return compareAndReplaceMinCapacity(resList, d.ginit.GetMinCapacity)
+	}
+
 	diskCores, err := d.disk.DiskSpaceToCores()
 	if err != nil {
 		klog.Errorf("disk space to cpus err: %v", err)
