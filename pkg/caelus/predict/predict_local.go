@@ -56,19 +56,9 @@ func (p *localPredict) Predict() v1.ResourceList {
 
 	// if predict is disabled, just return zero quantity
 	if p.Disable {
-		var onlineCpu, onlineMem float64
-		var err error
-		_ = wait.PollImmediate(time.Second*5, time.Minute*2, func() (bool, error) {
-			onlineCpu, onlineMem, err = p.getRecentOnlineResource()
-			if err != nil {
-				klog.Errorf("failed get recent resource: %v", err)
-				return false, nil
-			}
-			return true, nil
-		})
 		return v1.ResourceList{
-			v1.ResourceCPU:    *resource.NewMilliQuantity(int64(onlineCpu), resource.DecimalSI),
-			v1.ResourceMemory: *resource.NewQuantity(int64(onlineMem), resource.DecimalSI),
+			v1.ResourceCPU:    *resource.NewMilliQuantity(cpu, resource.DecimalSI),
+			v1.ResourceMemory: *resource.NewQuantity(mem, resource.DecimalSI),
 		}
 	}
 
