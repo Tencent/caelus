@@ -122,10 +122,11 @@ func (g *GInit) GetStatus() (bool, error) {
 		return false, fmt.Errorf("get staus failed: %v, response body %s", errs, string(data))
 	}
 	if resp.StatusCode != 200 {
-		return false, fmt.Errorf("get status failed %d: %s", resp.StatusCode, resp.Status)
+		return false, fmt.Errorf("get status failed %d: %s, response body %s", resp.StatusCode, resp.Status, string(data))
 	}
 
 	if nmStatus.State == "DOWN" {
+		klog.Errorf("nodemanager is DOWN: %s", nmStatus.Description)
 		return false, nil
 	}
 
@@ -595,10 +596,10 @@ func (g *GInit) sendRequest(action string, method string, sendBody, respBody int
 		return fmt.Errorf("unsupported method")
 	}
 	if len(errs) > 0 {
-		return fmt.Errorf("request action %s failed: %v, response body %s", action, errs, string(data))
+		return fmt.Errorf("request action %s failed: %v, response body %s", action, errs, data)
 	}
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("request action %s  failed %d: %s", action, resp.StatusCode, resp.Status)
+		return fmt.Errorf("request action %s failed %d: %s, response body %s", action, resp.StatusCode, resp.Status, data)
 	}
 	return nil
 }
