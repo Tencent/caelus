@@ -49,7 +49,7 @@ func (p *vpaPredict) Predict() v1.ResourceList {
 	nodeName := util.NodeName()
 
 	// get predict result from remote VPA server
-	client := p.rpcClient.Clone().Get(fmt.Sprintf("http://%s%s/%s",
+	client := p.rpcClient.Clone().Get(fmt.Sprintf("http://%s%s%s",
 		p.PredictServerAddr, PredictPath, nodeName))
 	resp, _, errs := client.EndStruct(&res)
 	if len(errs) > 0 {

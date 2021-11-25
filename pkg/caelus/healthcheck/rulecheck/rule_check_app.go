@@ -105,7 +105,7 @@ func (a *appHealthChecker) Check() *action.ActionResult {
 		return acResult
 	}
 	if len(cStates) == 0 {
-		klog.V(4).Infof("list customize resource recent state, got nil")
+		klog.V(5).Infof("list customize resource recent state, got nil")
 		return acResult
 	}
 
