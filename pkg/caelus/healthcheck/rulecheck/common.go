@@ -353,7 +353,9 @@ func mergeAction(acRet *action.ActionResult, actions []action.Action, actionsAno
 			continue
 		}
 		klog.V(4).Infof("%s action type %s with result %+v", checker, ac.ActionType(), aRet)
-		acRet.Merge(aRet)
+		if aRet != nil {
+			acRet.Merge(aRet)
+		}
 	}
 }
 
