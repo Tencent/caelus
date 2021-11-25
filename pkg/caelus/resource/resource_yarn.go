@@ -186,21 +186,23 @@ func (y *yarnClient) KillOfflineJob(conflictingResource v1.ResourceName) {
 // AdaptAndUpdateOfflineResource format and update resources
 func (y *yarnClient) AdaptAndUpdateOfflineResource(offlineList v1.ResourceList,
 	conflictingResources []string) error {
-	restart, err := y.updateCapacity(offlineList, conflictingResources)
-	if err != nil {
-		klog.Errorf("update capacity err: %v", err)
-	} else {
-		if restart {
-			klog.Infof("nodemanager capacity resource has changed, need to restart, stopping firstly")
-			err = y.ginit.StopNodemanager()
-			if err != nil {
-				klog.Errorf("stop nodemanager err: %v", err)
-			}
-		}
-	}
+	y.updateCapacity(offlineList, conflictingResources)
 
 	// check if nodemanager process is running, and restart if not running
-	y.startAndCheckNMProcess()
+	restart := y.startAndCheckNMProcess()
+	if restart {
+		// if nm restart and schedule should disable, will trigger a new DisableOfflineSchedule call
+		scheduleDisabled := false
+
+		y.scheduleLock.Lock()
+		scheduleDisabled = y.scheduleDisabled
+		y.scheduleDisabled = false
+		y.scheduleLock.Unlock()
+
+		if scheduleDisabled {
+			y.DisableOfflineSchedule()
+		}
+	}
 
 	return nil
 }
@@ -208,15 +210,19 @@ func (y *yarnClient) AdaptAndUpdateOfflineResource(offlineList v1.ResourceList,
 // updateCapacity update resource to node, and may kill offline jobs if necessary
 // restarted: if need to restart nodemanager process
 func (y *yarnClient) updateCapacity(res v1.ResourceList,
-	conflictingResources []string) (restarted bool, err error) {
+	conflictingResources []string) {
 	capChanged, capIncrease := y.beCapacity(res, len(conflictingResources) > 0)
 	metrics.NodeResourceMetricsReset(res, metrics.NodeResourceTypeOfflineFormat)
 	if !capChanged {
 		klog.V(4).Infof("no need to change node resource capacity")
-		return false, nil
+		return
 	}
 	klog.Infof("node resource will changed to %+v", res)
 	klog.V(4).Infof("sync node resource, after nodemanager reserved: %+v", res)
+	scheduleDisabled := false
+	y.scheduleLock.RLock()
+	scheduleDisabled = y.scheduleDisabled
+	y.scheduleLock.RUnlock()
 
 	expectCap := &global.NMCapacity{
 		Vcores:   res.Cpu().MilliValue() / types.CpuUnit,
@@ -225,17 +231,15 @@ func (y *yarnClient) updateCapacity(res v1.ResourceList,
 	if capIncrease {
 		if y.lastCapIncTimestamp.Add(y.YarnConfig.CapacityIncInterval.TimeDuration()).After(time.Now()) {
 			klog.V(2).Infof("checking increasing capacity, while too frequently, nothing to do!")
-			return false, nil
+			return
 		}
 
 		klog.Infof("increasing nodemanager capacity resource: %+v", expectCap)
-		y.ginit.EnsureCapacity(expectCap, conflictingResources, false)
+		y.ginit.EnsureCapacity(expectCap, conflictingResources, false, scheduleDisabled)
 		y.lastCapIncTimestamp = time.Now()
 	} else {
-		y.ginit.EnsureCapacity(expectCap, conflictingResources, true)
+		y.ginit.EnsureCapacity(expectCap, conflictingResources, true, scheduleDisabled)
 	}
-	// EnsureCapacity has already restart nodemanager
-	return false, nil
 }
 
 // beCapacity format the resource quantity, and compare with the original capacity. The return values are:
@@ -331,28 +335,29 @@ func (y *yarnClient) checkNMProcessReady() (bool, error) {
 	return y.ginit.GetStatus()
 }
 
-func (y *yarnClient) startAndCheckNMProcess() {
-	waiting := time.Duration(10 * time.Second)
+// startAndCheckNMProcess check if nm process is ready, and if not ready, will start nm and return true
+func (y *yarnClient) startAndCheckNMProcess() bool {
+	waiting := 10 * time.Second
 
 	// check if the nodemanager process is running
 	running, err := y.checkNMProcessReady()
 	if err != nil {
 		klog.Errorf("nodemanager status err when checking: %v", err)
-		return
+		return false
 	}
 	if !running {
 		klog.Infof("nodemanager is not running, try restarting")
 		err = y.ginit.StartNodemanager()
 		if err != nil {
 			klog.Errorf("start nodemanager err when checking: %v", err)
-			return
+			return true
 		} else {
 			klog.Infof("nodemanager restart successfully, check again after %v", waiting)
 			time.Sleep(waiting)
 			running, err := y.checkNMProcessReady()
 			if err != nil {
 				klog.Errorf("nodemanager status check err after %v: %v", waiting, err)
-				return
+				return true
 			}
 			if !running {
 				msg := fmt.Sprintf("nodemanager restart successfully, while not running after %v", waiting)
@@ -360,9 +365,10 @@ func (y *yarnClient) startAndCheckNMProcess() {
 				alarm.SendAlarm(msg)
 			}
 		}
+		return true
 	}
 
-	return
+	return false
 }
 
 // Describe implement the prometheus interface

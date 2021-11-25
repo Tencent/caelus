@@ -73,7 +73,7 @@ type GInitInterface interface {
 	// SetCapacity set nodemanager resource capacity
 	SetCapacity(capacity *global.NMCapacity) error
 	// EnsureCapacity set capacity resource, and kill containers if necessary
-	EnsureCapacity(expect *global.NMCapacity, conflictingResources []string, decreaseCap bool)
+	EnsureCapacity(expect *global.NMCapacity, conflictingResources []string, decreaseCap, scheduleDisabled bool)
 	// WatchForMetricsPort watch changes of nodemanager metrics port, it is not thread safe
 	WatchForMetricsPort() chan int
 	// GetNMWebappPort get nodemanager webapp port
@@ -301,8 +301,16 @@ func (g *GInit) GetAllocatedJobs() ([]types.OfflineJobs, error) {
 }
 
 // EnsureCapacity set capacity resource, and kill containers if necessary.
-func (g *GInit) EnsureCapacity(expect *global.NMCapacity, conflictingResources []string, decreaseCap bool) {
-	err := g.UpdateNodeCapacity(expect, false)
+func (g *GInit) EnsureCapacity(expect *global.NMCapacity, conflictingResources []string, decreaseCap, scheduleDisabled bool) {
+	nodeCap := &global.NMCapacity{
+		Vcores:    expect.Vcores,
+		Millcores: expect.Millcores,
+		MemoryMB:  expect.MemoryMB,
+	}
+	if scheduleDisabled {
+		nodeCap.Vcores = 0
+	}
+	err := g.UpdateNodeCapacity(nodeCap, false)
 	if err != nil {
 		klog.Errorf("update yarn capacity(%v) without force err: %v", expect, err)
 	}
