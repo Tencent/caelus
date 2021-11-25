@@ -79,7 +79,7 @@ func (fg *fakeGinit) WatchForMetricsPort() chan int {
 }
 
 // GetNMWebappPort get nodemanager webapp port
-func (fg *fakeGinit) GetNMWebappPort() (int, error) {
+func (fg *fakeGinit) GetNMWebappPort() (*int, error) {
 	panic("implement me")
 }
 

@@ -77,7 +77,7 @@ type GInitInterface interface {
 	// WatchForMetricsPort watch changes of nodemanager metrics port, it is not thread safe
 	WatchForMetricsPort() chan int
 	// GetNMWebappPort get nodemanager webapp port
-	GetNMWebappPort() (int, error)
+	GetNMWebappPort() (*int, error)
 	// GetAllocatedJobs return container list, including resources and job state
 	GetAllocatedJobs() ([]types.OfflineJobs, error)
 	// GetMinCapacity get minimum capacity for nodemanager
@@ -138,6 +138,9 @@ func (g *GInit) StartNodemanager() error {
 		if err := g.ensurePort(); err != nil {
 			return fmt.Errorf("ensure nm port: %v", err)
 		}
+	} else {
+		// if port auto detect is closed, need to notify the right metric port to metrics module
+		g.sendMetricsPort()
 	}
 
 	// set multi local paths

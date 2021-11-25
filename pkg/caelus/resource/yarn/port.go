@@ -50,6 +50,18 @@ var (
 	metricsPortKey = portNames[2]
 )
 
+// sendMetricsPort always get the right nodemanager web app port
+func (g *GInit) sendMetricsPort() {
+	if g.metricsPortChan != nil {
+		metricsPort, err := g.GetNMWebappPort()
+		if err != nil || metricsPort == nil {
+			klog.Errorf("get nodemanager web app port err or nil port value: %v", err)
+		} else {
+			g.metricsPortChan <- *metricsPort
+		}
+	}
+}
+
 // ensurePort choose nodemanager port automatically
 func (g *GInit) ensurePort() error {
 	restorePortsCheckpoint()
@@ -103,23 +115,23 @@ func (g *GInit) WatchForMetricsPort() chan int {
 }
 
 // GetNMWebappPort get nodemanager webapp port,
-// return default port if getting from server failed
-func (g *GInit) GetNMWebappPort() (int, error) {
+// return nil when getting from server failed
+func (g *GInit) GetNMWebappPort() (*int, error) {
 	m, err := g.GetProperty(YarnSite, []string{yarnNodeManagerWebappAddress}, false)
 	if err != nil {
-		return defaultWebappAddressPort, err
+		return nil, err
 	}
 	if value, ok := m[yarnNodeManagerWebappAddress]; ok {
 		portStr := strings.TrimPrefix(value, util.NodeIP()+":")
 		port, err := strconv.Atoi(portStr)
 		if err == nil {
-			return port, nil
+			return &port, nil
 		}
 	} else {
 		err = fmt.Errorf("key(%s) not found", yarnNodeManagerWebappAddress)
 	}
 
-	return defaultWebappAddressPort, err
+	return nil, err
 }
 
 func restorePortsCheckpoint() {
