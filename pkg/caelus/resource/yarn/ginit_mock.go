@@ -69,7 +69,7 @@ func (fg *fakeGinit) SetCapacity(capacity *global.NMCapacity) error {
 }
 
 // EnsureCapacity set capacity resource, and kill containers if necessary
-func (fg *fakeGinit) EnsureCapacity(expect *global.NMCapacity, conflictingResources []string, decreaseCap bool) {
+func (fg *fakeGinit) EnsureCapacity(expect *global.NMCapacity, conflictingResources []string, decreaseCap, scheduleDisabled bool) {
 	panic("implement me")
 }
 
