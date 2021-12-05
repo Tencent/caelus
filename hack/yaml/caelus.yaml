@@ -313,7 +313,7 @@ data:
         "container_rules": [
           {
             "metrics": [
-                "nr_cpu_throttled",
+                "nr_cpu_throttled"
             ],
             "check_interval": "5s",
             "handle_interval": "10s",
