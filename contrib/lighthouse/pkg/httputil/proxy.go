@@ -170,7 +170,22 @@ func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		transport = http.DefaultTransport
 	}
 
-	outreq := p.generateOutRequest(rw, req)
+	ctx := req.Context()
+	if cn, ok := rw.(http.CloseNotifier); ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithCancel(ctx)
+		defer cancel()
+		notifyChan := cn.CloseNotify()
+		go func() {
+			select {
+			case <-notifyChan:
+				cancel()
+			case <-ctx.Done():
+			}
+		}()
+	}
+
+	outreq := p.generateOutRequest(ctx, rw, req)
 	res, err := transport.RoundTrip(outreq)
 	if err != nil {
 		p.getErrorHandler()(rw, outreq, err)
@@ -247,22 +262,7 @@ func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (p *ReverseProxy) generateOutRequest(rw http.ResponseWriter, req *http.Request) *http.Request {
-	ctx := req.Context()
-	if cn, ok := rw.(http.CloseNotifier); ok {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithCancel(ctx)
-		defer cancel()
-		notifyChan := cn.CloseNotify()
-		go func() {
-			select {
-			case <-notifyChan:
-				cancel()
-			case <-ctx.Done():
-			}
-		}()
-	}
-
+func (p *ReverseProxy) generateOutRequest(ctx context.Context, rw http.ResponseWriter, req *http.Request) *http.Request {
 	outreq := req.Clone(ctx)
 	if req.ContentLength == 0 {
 		outreq.Body = nil // Issue 16036: nil Body for http.Transport retries
