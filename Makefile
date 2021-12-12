@@ -4,7 +4,7 @@ REGISTRY ?= caelus
 build: image
 	image=${REGISTRY}/caelus:$$(cat VERSION); \
 	mkdir -p _output/bin/; \
-	docker run --rm $$image tar -cvf - /caelus | tar -xvf - -C _output/bin/
+	docker run --rm $$image tar -cvf -  -C /binaries . | tar -xvf - -C _output/bin/
 
 .PHONY: format
 format:

@@ -13,15 +13,30 @@ RUN go mod download
 COPY cmd/ cmd/
 COPY pkg/ pkg/
 COPY hack/ hack/
+COPY contrib/ contrib/
+COPY .git/ .git/
 
-# Build
-RUN hack/build.sh
+# mkdir binary folder
+RUN mkdir -p binaries
+
+# Build caelus
+RUN hack/build.sh && \
+    cp _output/bin/* /workspace/binaries/
+
+# Build lighthouse
+RUN cd /workspace/contrib/lighthouse && \
+    ./hack/binary && \
+    cp _output/bin/* /workspace/binaries/
+RUN cd /workspace/contrib/lighthouse-plugin && \
+    ./hack/binary && \
+    cp _output/bin/* /workspace/binaries/
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM centos:centos7
 WORKDIR /
 COPY --from=builder /workspace/_output/bin/caelus ./
+COPY --from=builder /workspace/binaries /binaries/
 #USER nonroot:nonroot
 
 # Used to quickly reclaim memory
