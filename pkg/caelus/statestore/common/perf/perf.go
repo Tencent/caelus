@@ -186,11 +186,18 @@ func (p *perfStoreManager) collect() {
 
 	wg := sync.WaitGroup{}
 	for k, v := range allCgroups {
+
+		ignoreFlag := false
+
 		for _, ignored := range p.IgnoredCgroups {
 			if checkSubCgroup(ignored, k) {
 				klog.V(4).Infof("cgroup(%s) has been ignored", k)
-				continue
+				ignoreFlag = true
+				break
 			}
+		}
+		if ignoreFlag {
+			continue
 		}
 
 		wg.Add(1)
