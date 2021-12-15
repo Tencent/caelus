@@ -391,7 +391,7 @@ func GetCapacity() (global.NMCapacity, error) {
 func SetCapacity(capacity global.NMCapacity) error {
 	func() {
 		cacheCapacityLock.Lock()
-		cacheCapacityLock.Unlock()
+		defer cacheCapacityLock.Unlock()
 
 		if cacheCapacity == nil {
 			cacheCapacity = &global.NMCapacity{}
