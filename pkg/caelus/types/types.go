@@ -345,7 +345,6 @@ type MetricsCollectConfig struct {
 // MetricsNodeConfig is the configuration for node metrics collection
 type MetricsNodeConfig struct {
 	CollectInterval times.Duration `json:"collect_interval"`
-	SystemProcesses []string       `json:"system_processes"`
 	OfflineType     string         `json:"-"`
 	Devices         `json:",inline"`
 }
@@ -354,7 +353,7 @@ type MetricsNodeConfig struct {
 type Devices struct {
 	// Ifaces are the network interfaces, e.g. eth0, those not exist or down will be filter out
 	// these ifaces will be assigned to metrics.node.ifaces
-	IfacesWithProperty []string `json:"ifaces_xxx"`
+	IfacesWithProperty []string `json:"ifaces_with_property"`
 	Ifaces             []string `json:"-"`
 	// DiskNames are the disk names, e.g. sda, vda, those not exist will be filter out
 	// these ifaces will be assigned to metrics.node.deviceNames

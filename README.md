@@ -34,11 +34,6 @@ Find more usage at [Tutorial.md](doc/tutorial.md). The project also have two att
 
 [nm_operator](doc/nm_operator.md) is used to execute YARN commands in the way of remote API.
 
-#### metric_adapter
-
-[metric_adapter](doc/metric_adapter.md) is used to collect more application metrics with adapter extension.
-
-
 ## Getting started
 
 ### Build
@@ -79,6 +74,9 @@ $ kubectl create -f hack/yaml/caelus.yaml
 $ kubectl label node colation=true
 $ kubectl -n kube-system get daemonset
 ```
+
+### More
+You could find more about how to start with Caelus from the [DETAIL](doc/start.md)
 
 ## Contributing
 For more information about contributing issues or pull requests, see our [Contributing to Caelus](doc/contributing.md).

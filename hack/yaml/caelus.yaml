@@ -121,9 +121,8 @@ data:
       "metrics": {
         "node": {
           "collect_interval": "15s",
-          "ifaces_xxx": [],
-          "disk_names": ["sda"],
-          "system_processes": []
+          "ifaces_with_property": [],
+          "disk_names": ["sda"]
         },
         "container": {
           "resources": [
