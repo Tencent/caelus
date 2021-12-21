@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tencent/caelus/pkg/caelus/cpi"
 	"github.com/tencent/caelus/pkg/caelus/diskquota"
 	"github.com/tencent/caelus/pkg/caelus/statestore"
 	"github.com/tencent/caelus/pkg/caelus/statestore/cgroup"
@@ -509,17 +508,6 @@ func randThree(f float64) float64 {
 // perfData return perf related metrics
 func perfData(perfMetrics *perfstore.PerfMetrics) metricValues {
 	jobName := getJobName(perfMetrics.Spec.PodName, perfMetrics.Spec.ContainerName)
-	taskName := getTaskName(perfMetrics.Spec.PodName, perfMetrics.Spec.ContainerName)
-	// the data used to find outliers and identify antagonists by cpiManager must be the same with those sent to prometheus
-	cpi.AddRecord(cpi.CPIRecord{
-		TaskMeta: cpi.TaskMeta{
-			JobName:  jobName,
-			TaskName: taskName,
-		},
-		CPI:       perfMetrics.Value.CPI,
-		CPUUsage:  perfMetrics.Value.CPUUsage,
-		Timestamp: perfMetrics.Value.Timestamp,
-	})
 	return metricValues{
 		{
 			value:     perfMetrics.Value.Cycles,
@@ -806,11 +794,4 @@ func getJobName(podName, containerName string) string {
 		}
 	}
 	return jobName
-}
-
-func getTaskName(podName, containerName string) string {
-	if podName != "" {
-		return podName
-	}
-	return containerName
 }

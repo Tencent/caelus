@@ -20,11 +20,12 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/tencent/caelus/pkg/caelus/alarm"
-
+	"github.com/tencent/caelus/pkg/caelus/statestore"
 	"github.com/tencent/caelus/pkg/caelus/types"
 
 	"github.com/prometheus/client_golang/api"
@@ -53,10 +54,11 @@ type CPIManager struct {
 	cpuCache map[TaskMeta]*timeSeries
 	// jobSpecCache caches latest jobSpec received from prometheus
 	jobSpecCache map[string]JobSpec
+	stStore      statestore.StateStore
 }
 
 // InitManager initializes default CPIManager
-func InitManager(cfg types.CPIManagerConfig) error {
+func InitManager(cfg types.CPIManagerConfig, stStore statestore.StateStore) error {
 	if defaultManager != nil {
 		return nil
 	}
@@ -74,41 +76,13 @@ func InitManager(cfg types.CPIManagerConfig) error {
 		cpiCache:          make(map[TaskMeta]*timeSeries),
 		cpuCache:          make(map[TaskMeta]*timeSeries),
 		jobSpecCache:      make(map[string]JobSpec),
+		stStore:           stStore,
 	}
+	go wait.Forever(defaultManager.addRecords, time.Minute)
 	go wait.Forever(defaultManager.identifyAntagonists, 5*time.Minute)
 	go wait.Forever(defaultManager.deleteExpiredCache, 5*time.Minute)
 	klog.Infof("started cpi manager")
 	return nil
-}
-
-// AddRecord adds record to default CPIManager
-func AddRecord(record CPIRecord) {
-	if defaultManager != nil {
-		defaultManager.AddRecord(record)
-	}
-}
-
-// AddRecord caches record in CPIManager
-func (m *CPIManager) AddRecord(record CPIRecord) {
-	m.Lock()
-	defer m.Unlock()
-	t := TaskMeta{
-		JobName:  record.JobName,
-		TaskName: record.TaskName,
-	}
-	cpiSeries, ok := m.cpiCache[t]
-	if !ok {
-		cpiSeries = newTimeSeries()
-		m.cpiCache[t] = cpiSeries
-	}
-	cpiSeries.add(record.CPI, record.Timestamp)
-
-	cpuSeries, ok := m.cpuCache[t]
-	if !ok {
-		cpuSeries = newTimeSeries()
-		m.cpuCache[t] = cpuSeries
-	}
-	cpuSeries.add(record.CPUUsage, record.Timestamp)
 }
 
 // identifyAntagonists detects outliers and try to find antagonists
@@ -225,6 +199,55 @@ func (m *CPIManager) deleteExpiredCache() {
 			delete(m.jobSpecCache, jobName)
 		}
 	}
+}
+
+func (m *CPIManager) addRecords() {
+	containerPerfMetrics, err := m.stStore.ListPerfResourceRecentStats()
+	if err != nil {
+		return
+	}
+	m.Lock()
+	defer m.Unlock()
+
+	for _, cp := range containerPerfMetrics {
+		jobName := getJobName(cp.Spec.PodName, cp.Spec.ContainerName)
+		taskName := getTaskName(cp.Spec.PodName, cp.Spec.ContainerName)
+		t := TaskMeta{
+			JobName:  jobName,
+			TaskName: taskName,
+		}
+		cpiSeries, ok := m.cpiCache[t]
+		if !ok {
+			cpiSeries = newTimeSeries()
+			m.cpiCache[t] = cpiSeries
+		}
+		cpiSeries.add(cp.Value.CPI, cp.Value.Timestamp)
+
+		cpuSeries, ok := m.cpuCache[t]
+		if !ok {
+			cpuSeries = newTimeSeries()
+			m.cpuCache[t] = cpuSeries
+		}
+		cpuSeries.add(cp.Value.CPUUsage, cp.Value.Timestamp)
+	}
+}
+
+func getJobName(podName, containerName string) string {
+	jobName := containerName
+	if podName != "" {
+		delimeterIndex := strings.LastIndex(podName, "-")
+		if delimeterIndex != -1 {
+			jobName = podName[:delimeterIndex]
+		}
+	}
+	return jobName
+}
+
+func getTaskName(podName, containerName string) string {
+	if podName != "" {
+		return podName
+	}
+	return containerName
 }
 
 // findOutlier finds outliers by comparing cpi data of each task to jobSpec
@@ -361,14 +384,6 @@ type sampleWithTTL struct {
 	metric    model.Metric
 	sample    model.SamplePair
 	expiredAt time.Time
-}
-
-// CPIRecord contains cpi and cpu data for a task
-type CPIRecord struct {
-	TaskMeta
-	CPI       float64
-	CPUUsage  float64
-	Timestamp time.Time
 }
 
 // JobSpec contains aggregated cpi data for a job
