@@ -51,6 +51,8 @@ var (
 	metricsNameOnlineJob           = "onlineJob"
 	metricsDiskSpace               = "diskSpace"
 
+	metricsAlarmCounter = "alarmCounter"
+
 	totalMetrics = map[string]prometheus.Collector{
 		// InterferenceCounter is the interference count
 		metricNameInterferenceCounter: prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -91,6 +93,11 @@ var (
 			Name: "caelus_disk_space_gb",
 			Help: "caelus node disk space",
 		}, []string{"node", "type", "mountpoint"}),
+
+		metricsAlarmCounter: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "caelus_alarm_counter",
+			Help: "counts of alarm message",
+		}, []string{"node"}),
 	}
 )
 
@@ -157,4 +164,10 @@ func DiskSpaceMetrics(diskStats map[string]*types.DiskPartitionStats) {
 		diskSpaceMetric.WithLabelValues(nodeName, "total", mountpoint).Set(float64(stat.TotalSize / types.DiskUnit))
 		diskSpaceMetric.WithLabelValues(nodeName, "free", mountpoint).Set(float64(stat.FreeSize / types.DiskUnit))
 	}
+}
+
+// AlarmCounterInc increases alarm metric counter
+func AlarmCounterInc() {
+	alarmMetrics := totalMetrics[metricsAlarmCounter].(*prometheus.CounterVec)
+	alarmMetrics.WithLabelValues(util.NodeIP()).Inc()
 }

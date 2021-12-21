@@ -233,7 +233,7 @@ func (o *options) initModules(caelus *types.CaelusConfig, ctx *context.CaelusCon
 	}
 	// cpi manager
 	if caelus.CpiManager.Enable {
-		if err := cpi.InitManager(caelus.CpiManager); err != nil {
+		if err := cpi.InitManager(caelus.CpiManager, stStore); err != nil {
 			klog.Fatalf("init cpi manager failed: %v", err)
 		}
 	}

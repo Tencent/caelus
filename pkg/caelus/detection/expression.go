@@ -136,7 +136,7 @@ func (e *ExpressionDetector) IsAnomaly() (bool, error) {
 			val := e.params[v]
 			params[v] = val
 		}
-		e.reason = fmt.Sprintf("expression(%s) abnormal(%v)", e.exp.String(), params)
+		e.reason = fmt.Sprintf("expression(%s) abnormal", e.exp.String())
 	}
 	return ret, nil
 }

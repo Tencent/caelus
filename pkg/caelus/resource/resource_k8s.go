@@ -262,7 +262,6 @@ func (k *k8sClient) EnableOfflineSchedule() error {
 	if !k.extResScheduleDisabled {
 		return nil
 	}
-	alarm.SendAlarm("schedule is opening")
 	klog.V(2).Infof("schedule is opening")
 	k.extResScheduleDisabled = false
 	metrics.NodeScheduleDisabled(0)

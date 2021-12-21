@@ -162,7 +162,6 @@ func (y *yarnClient) EnableOfflineSchedule() error {
 	if !y.scheduleDisabled {
 		return nil
 	}
-	alarm.SendAlarm("schedule is opening")
 	klog.V(2).Infof("schedule is opening")
 	err := y.ginit.EnableSchedule()
 	if err != nil {

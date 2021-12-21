@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/tencent/caelus/pkg/caelus/metrics"
 	"github.com/tencent/caelus/pkg/caelus/types"
 	"github.com/tencent/caelus/pkg/caelus/util"
 
@@ -47,11 +48,10 @@ func SendAlarm(msg string) {
 				return
 			}
 		}
-
+		metrics.AlarmCounterInc()
 		klog.V(4).Infof("receiving alarm: %s", msg)
-		msg = fmt.Sprintf("%s[%s]", msg, time.Now().Format("2006-01-02 15:04:05"))
 		select {
-		case alarmManager.msgBuffers <- msg:
+		case alarmManager.msgBuffers <- alarmMsg{ts: time.Now(), msg: msg}:
 		default:
 			klog.Errorf("alarm channel is full, dropping msg: %s", msg)
 		}
@@ -71,13 +71,18 @@ type Manager struct {
 	localIP string
 	delayer *time.Timer
 	alarms  struct {
-		messages []string
+		messages map[string][]time.Time
 		sync.RWMutex
 	}
-	msgBuffers chan string
+	msgBuffers chan alarmMsg
 	// different sending channel
 	send sendChannel
 	ojg  offlineJobGetter
+}
+
+type alarmMsg struct {
+	msg string
+	ts  time.Time
 }
 
 // NewManager returns an instance of alarm manager
@@ -86,11 +91,11 @@ func NewManager(cfg *types.AlarmConfig, ojg offlineJobGetter) *Manager {
 		AlarmConfig: *cfg,
 		localIP:     util.NodeIP(),
 		alarms: struct {
-			messages []string
+			messages map[string][]time.Time
 			sync.RWMutex
-		}{messages: []string{}},
+		}{messages: make(map[string][]time.Time)},
 
-		msgBuffers: make(chan string, 100),
+		msgBuffers: make(chan alarmMsg, 100),
 		ojg:        ojg,
 	}
 
@@ -126,26 +131,29 @@ func (a *Manager) Run(stop <-chan struct{}) {
 			case msg := <-a.msgBuffers:
 				// if ignoring warning is true, no need alarm when entry silence mode
 				if a.IgnoreAlarmWhenSilence && util.SilenceMode {
-					klog.Warningf("entry silence mode and ignore warning is true, drop the msg: %s", msg)
+					klog.Warningf("entry silence mode and ignore warning is true, drop the msg: %s", msg.msg)
 					return
 				}
 
 				func() {
 					a.alarms.Lock()
 					defer a.alarms.Unlock()
-
-					a.alarms.messages = append(a.alarms.messages, msg)
-					if len(a.alarms.messages) >= a.MessageBatch {
+					a.alarms.messages[msg.msg] = append(a.alarms.messages[msg.msg], msg.ts)
+					msgLen := 0
+					for _, tss := range a.alarms.messages {
+						msgLen += len(tss)
+					}
+					if msgLen >= a.MessageBatch {
 						body := &AlarmBody{
 							IP:       a.localIP,
 							Cluster:  a.Cluster,
-							AlarmMsg: a.alarms.messages,
+							AlarmMsg: a.getAlarmMessages(),
 						}
 						klog.Infof("sending alarms: %v", body.AlarmMsg)
 						// send alarm can fork another thread
 						go a.send.sendMessage(body)
 						// clear messages already sent
-						a.alarms.messages = []string{}
+						a.alarms.messages = make(map[string][]time.Time)
 					} else {
 						if a.delayer == nil {
 							klog.V(4).Infof("timer is nil, sending after %v", a.MessageDelay)
@@ -172,11 +180,24 @@ func (a *Manager) delaySend() {
 	body := &AlarmBody{
 		IP:       a.localIP,
 		Cluster:  a.Cluster,
-		AlarmMsg: a.alarms.messages,
+		AlarmMsg: a.getAlarmMessages(),
 	}
 	klog.V(4).Infof("delay sending alarms: %v", body.AlarmMsg)
 	go a.send.sendMessage(body)
-	a.alarms.messages = []string{}
+	a.alarms.messages = make(map[string][]time.Time)
+}
+
+func (a *Manager) getAlarmMessages() []string {
+	var messages []string
+	for msg, tss := range a.alarms.messages {
+		if len(tss) == 1 {
+			messages = append(messages, fmt.Sprintf("%s[%s]", msg, tss[0].Format("15:04:05")))
+		} else {
+			messages = append(messages, fmt.Sprintf("%s[%s - %s, %d]",
+				msg, tss[0].Format("15:04:05"), tss[len(tss)-1].Format("15:04:05"), len(tss)))
+		}
+	}
+	return messages
 }
 
 // sendChannel is the interface to send alarm message

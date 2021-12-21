@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -148,7 +149,7 @@ func TestSendAlarm(t *testing.T) {
 		for _, msg := range ac.alarmMsg {
 			if ac.expectResult != nil {
 				ac.expectResult.AlarmMsg = append(ac.expectResult.AlarmMsg,
-					fmt.Sprintf("%s[%s]", msg, time.Now().Format("2006-01-02 15:04:05")))
+					fmt.Sprintf("%s[%s]", msg, time.Now().Format("15:04:05")))
 			}
 			SendAlarm(msg)
 			time.Sleep(1 * time.Second)
@@ -159,16 +160,34 @@ func TestSendAlarm(t *testing.T) {
 			t.Fatalf("read alarm message from file err: %v", err)
 		}
 
-		expectAlarmMsg := ""
 		if ac.expectResult != nil {
-			expectAlarmBytes, _ := json.Marshal(ac.expectResult)
-			expectAlarmMsg = string(expectAlarmBytes)
-		}
-
-		if expectAlarmMsg != alarmMsg {
-			t.Fatalf("unexpected alarm result, should be(%s), but get: %s", expectAlarmMsg, alarmMsg)
+			var alarmBody AlarmBody
+			if err = json.Unmarshal([]byte(alarmMsg), &alarmBody); err != nil {
+				t.Fatalf("unexpected alarm message %s", alarmMsg)
+			}
+			if ac.expectResult.IP != alarmBody.IP || ac.expectResult.Cluster != alarmBody.Cluster ||
+				!stringSliceEqual(ac.expectResult.AlarmMsg, alarmBody.AlarmMsg) {
+				t.Fatalf("unexpected alarm message %s expect %v", alarmMsg, *ac.expectResult)
+			}
 		}
 	}
+}
+
+func stringSliceEqual(s1, s2 []string) bool {
+	if len(s1) != len(s2) {
+		return false
+	}
+	if len(s1) == 0 {
+		return true
+	}
+	sort.Strings(s1)
+	sort.Strings(s2)
+	for i := range s1 {
+		if s1[i] != s2[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func generatLocalAlarmExecutor() {
