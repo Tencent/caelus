@@ -145,7 +145,7 @@ func (g *GInit) StartNodemanager() error {
 	}
 
 	// set multi local paths
-	localDirs, logDirs := g.disk.GetLocalDirs()
+	localDirs, logDirs, spaceLimited := g.disk.GetLocalDirs()
 	localProperty := make(map[string]string)
 	if len(localDirs) != 0 {
 		localProperty[LocalDirs] = strings.Join(localDirs, ",")
@@ -158,6 +158,14 @@ func (g *GInit) StartNodemanager() error {
 		if err != nil {
 			return err
 		}
+	}
+	// if all partitions' size are too small, just set nodemanager as unhealthy by the disk health checker
+	// you should know that new value will override the original value for the disk health checker
+	if spaceLimited {
+		g.Properties["yarn.nodemanager.disk-health-checker.min-free-space-per-disk-mb"] = "10240000"
+		metrics.DiskSpaceLimited(1)
+	} else {
+		metrics.DiskSpaceLimited(0)
 	}
 
 	if !g.EnableYarnQOS {

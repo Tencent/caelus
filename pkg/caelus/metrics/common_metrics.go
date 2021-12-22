@@ -50,6 +50,7 @@ var (
 	metricsNameSLONotMetCounter    = "sloNotMetCounter"
 	metricsNameOnlineJob           = "onlineJob"
 	metricsDiskSpace               = "diskSpace"
+	metricsNameDiskSpaceLimited    = "diskSpaceLimited"
 
 	metricsAlarmCounter = "alarmCounter"
 
@@ -93,6 +94,11 @@ var (
 			Name: "caelus_disk_space_gb",
 			Help: "caelus node disk space",
 		}, []string{"node", "type", "mountpoint"}),
+		// metricNameDiskSpaceLimited counts if the node has little disk space, and cannot run offline job
+		metricsNameDiskSpaceLimited: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "caelus_node_disk_space_limited",
+			Help: "caelus node disk space limited",
+		}, []string{"node"}),
 
 		metricsAlarmCounter: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "caelus_alarm_counter",
@@ -164,6 +170,13 @@ func DiskSpaceMetrics(diskStats map[string]*types.DiskPartitionStats) {
 		diskSpaceMetric.WithLabelValues(nodeName, "total", mountpoint).Set(float64(stat.TotalSize / types.DiskUnit))
 		diskSpaceMetric.WithLabelValues(nodeName, "free", mountpoint).Set(float64(stat.FreeSize / types.DiskUnit))
 	}
+}
+
+// DiskSpaceLimited counts if the node has little disk space, and cannot run offline job
+func DiskSpaceLimited(spaceLimited float64) {
+	nodeName := util.NodeIP()
+	diskSpaceLimitedMetrics := totalMetrics[metricsNameDiskSpaceLimited].(*prometheus.GaugeVec)
+	diskSpaceLimitedMetrics.With(prometheus.Labels{"node": nodeName}).Set(spaceLimited)
 }
 
 // AlarmCounterInc increases alarm metric counter

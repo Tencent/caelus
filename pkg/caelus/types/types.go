@@ -256,9 +256,9 @@ type YarnDisksConfig struct {
 	SpaceCheckPeriod  times.Duration `json:"space_check_period"`
 	// SpaceCheckReservedGb is used for checking disk space, it will start cleaning space if free disk space is less
 	// than SpaceCheckReservedGb
-	SpaceCheckReservedGb      int64   `json:"space_check_reserved_gb"`
-	SpaceCheckReservedPercent float64 `json:"space_check_reserved_percent"`
-	SpaceCleanDisable         bool    `json:"space_clean_disable"`
+	SpaceCheckReservedGb      *int64   `json:"space_check_reserved_gb"`
+	SpaceCheckReservedPercent *float64 `json:"space_check_reserved_percent"`
+	SpaceCleanDisable         bool     `json:"space_clean_disable"`
 	// SpaceCleanJustData is enabled, it will just restart nodemanager pod to release /data space, and
 	// do not care other disk partitions
 	SpaceCleanJustData bool `json:"space_clean_just_data"`
@@ -591,6 +591,13 @@ func initNodeResourceConfig(config *NodeResourceConfig, taskType *TaskTypeConfig
 	}
 	if config.YarnConfig.Disks.SpaceCheckPeriod.Seconds() == 0 {
 		config.YarnConfig.Disks.SpaceCheckPeriod = defaultDiskSpaceCheckPeriod
+	}
+	if config.YarnConfig.Disks.SpaceCheckEnabled {
+		if config.YarnConfig.Disks.SpaceCheckReservedGb == nil &&
+			config.YarnConfig.Disks.SpaceCheckReservedPercent == nil {
+			klog.Fatalf("disk space check is enabled, but either the SpaceCheckReservedGb or" +
+				"the SpaceCheckReservedPercent is assigned")
+		}
 	}
 
 	its := config.Silence.Periods
