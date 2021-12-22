@@ -230,22 +230,29 @@ func collectCPU() *NodeCpu {
 		klog.Errorf("cpu resource collect is nil")
 		return nil
 	}
+	offlineUsage, err := cgroup.GetCPUTotalUsage(types.CgroupOffline)
+	if err != nil {
+		klog.Errorf("failed get offline cpu usage: %v", err)
+		return nil
+	}
 
 	if lastNodeResourceState.CPU == nil {
 		lastNodeResourceState.CPU = &NodeCpu{
-			state:     usages,
-			timestamp: time.Now(),
+			offlineUsage: offlineUsage,
+			state:        usages,
+			timestamp:    time.Now(),
 		}
 		return nil
 	}
 
 	nowCpuState := &NodeCpu{
-		state:     usages,
-		timestamp: time.Now(),
+		offlineUsage: offlineUsage,
+		state:        usages,
+		timestamp:    time.Now(),
 	}
 
 	// calculate cpu consumption between the two timestamp
-	total, perCore, totalSteal, stealPerCore := calculateCpuUsage(lastNodeResourceState.CPU, nowCpuState)
+	total, perCore, totalSteal, stealPerCore, totalOffline := calculateCpuUsage(lastNodeResourceState.CPU, nowCpuState)
 	lastNodeResourceState.CPU = nowCpuState
 	if cpuNum == 0 {
 		cpuNum = float64(len(usages))
@@ -257,6 +264,7 @@ func collectCPU() *NodeCpu {
 		CpuAvg:          total / cpuNum,
 		CpuStealTotal:   totalSteal,
 		CpuStealPerCore: stealPerCore,
+		CpuOfflineTotal: totalOffline,
 	}
 }
 
@@ -283,13 +291,19 @@ func collectMemory() *NodeMemory {
 		klog.Errorf("mem resource collect err: %v", err)
 		return nil
 	}
+	offlineMem, err := cgroup.GetMemoryWorkingSet(types.CgroupOffline)
+	if err != nil {
+		klog.Errorf("offline mem resource collect err: %v", err)
+		return nil
+	}
 
 	return &NodeMemory{
-		Total:      float64(mem["MemTotal"]),
-		UsageTotal: float64(mem["MemTotal"] - mem["MemFree"]),
-		UsageRss:   float64(mem["MemTotal"] - mem["MemFree"] - mem["Buffers"] - mem["Cached"] + mem["Shmem"]),
-		UsageCache: float64(mem["Buffers"] + mem["Cached"] - mem["Shmem"]),
-		Available:  float64(mem["MemFree"] + mem["Buffers"] + mem["Cached"] - mem["Shmem"]),
+		Total:        float64(mem["MemTotal"]),
+		UsageTotal:   float64(mem["MemTotal"] - mem["MemFree"]),
+		UsageRss:     float64(mem["MemTotal"] - mem["MemFree"] - mem["Buffers"] - mem["Cached"] + mem["Shmem"]),
+		UsageCache:   float64(mem["Buffers"] + mem["Cached"] - mem["Shmem"]),
+		Available:    float64(mem["MemFree"] + mem["Buffers"] + mem["Cached"] - mem["Shmem"]),
+		OfflineTotal: float64(offlineMem),
 	}
 }
 
@@ -406,7 +420,7 @@ func getAllAndBusy(t cpu.TimesStat) (float64, float64) {
 }
 
 // calculateCpuUsage calculate cpu usage
-func calculateCpuUsage(t1, t2 *NodeCpu) (total float64, perCore []float64, totalSteal float64, perCoreSteal []float64) {
+func calculateCpuUsage(t1, t2 *NodeCpu) (total float64, perCore []float64, totalSteal float64, perCoreSteal []float64, totalOffline float64) {
 	total = 0
 	perCore = []float64{}
 	totalSteal = 0
@@ -437,7 +451,7 @@ func calculateCpuUsage(t1, t2 *NodeCpu) (total float64, perCore []float64, total
 		totalSteal += stealNanoCores
 	}
 
-	return total, perCore, totalSteal, perCoreSteal
+	return total, perCore, totalSteal, perCoreSteal, float64(t2.offlineUsage-t1.offlineUsage) / float64(nanoSeconds)
 }
 
 // calculateDiskIO calculate disk io usage

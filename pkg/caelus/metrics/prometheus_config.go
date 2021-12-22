@@ -143,6 +143,11 @@ func nodeCpuUsage(nodeSt *nodestore.NodeResourceState) metricValues {
 			timestamp: nodeSt.Timestamp,
 		})
 	}
+	values = append(values, metricValue{
+		value:     res.CpuOfflineTotal,
+		labels:    []string{"offline"},
+		timestamp: nodeSt.Timestamp,
+	})
 	return values
 }
 
@@ -220,6 +225,11 @@ func nodeMemoryUsage(nodeSt *nodestore.NodeResourceState) metricValues {
 			value:     bytesToGi(res.UsageCache),
 			timestamp: nodeSt.Timestamp,
 			labels:    []string{"cache"},
+		},
+		{
+			value:     bytesToGi(res.OfflineTotal),
+			timestamp: nodeSt.Timestamp,
+			labels:    []string{"offline"},
 		},
 	}
 }

@@ -21,6 +21,9 @@ import (
 	"path"
 	"strconv"
 	"strings"
+
+	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
 )
 
 const (
@@ -115,4 +118,27 @@ func readMemoryFile(file string) (string, error) {
 	}
 
 	return strings.Replace(string(dataBytes), "\n", "", -1), nil
+}
+
+// GetMemoryWorkingSet get memory working set usage for givin cgroup path
+func GetMemoryWorkingSet(pathInCgroup string) (int, error) {
+	root := GetRoot()
+	cgPath := path.Join(root, MemorySubsystem, pathInCgroup)
+	g := new(fs.MemoryGroup)
+	stats := cgroups.NewStats()
+	if err := g.GetStats(cgPath, stats); err != nil {
+		return 0, fmt.Errorf("get cpuacct cgroup stats failed: %v", err)
+	}
+	usage, err := GetMemoryUsage(pathInCgroup)
+	if err != nil {
+		return 0, err
+	}
+	if v, exist := stats.MemoryStats.Stats["total_inactive_file"]; exist {
+		if usage < int(v) {
+			usage = 0
+		} else {
+			usage -= int(v)
+		}
+	}
+	return usage, nil
 }

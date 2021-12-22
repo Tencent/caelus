@@ -25,11 +25,8 @@ import (
 	"github.com/tencent/caelus/pkg/caelus/detection"
 	"github.com/tencent/caelus/pkg/caelus/statestore"
 	"github.com/tencent/caelus/pkg/caelus/types"
-	"github.com/tencent/caelus/pkg/caelus/util/appclass"
-
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/autoscaler/vertical-pod-autoscaler/pkg/recommender/model"
 	"k8s.io/klog"
@@ -111,27 +108,11 @@ func (p *localPredict) getRecentOnlineResource() (float64, float64, error) {
 	}
 	cpuStats := nodeSt.CPU
 	memStats := nodeSt.Memory
-	containerStats, err := p.stStore.ListCgroupResourceRecentState(false, sets.NewString())
-	if err != nil {
-		return 0, 0, err
-	}
-	if len(containerStats) == 0 {
-		return 0, 0, fmt.Errorf("no container state")
-	}
-	var offlineCpu, offlineMem float64
-	for _, cs := range containerStats {
-		if cs.Ref == nil || cs.Ref.AppClass != appclass.AppClassOffline {
-			continue
-		}
-		offlineCpu += cs.CpuUsage
-		offlineMem += cs.MemoryWorkingSetUsage
-		klog.V(5).Infof("predicted offline added, ref: %+v, cpu: %f, mem: %f",
-			cs.Ref, cs.CpuUsage, cs.MemoryWorkingSetUsage)
-	}
+
 	klog.V(4).Infof("predict sample, total(%f, %f), offline(%f, %f)",
-		cpuStats.CpuTotal, memStats.UsageRss, offlineCpu, offlineMem)
-	milliCPU := math.Max(cpuStats.CpuTotal-offlineCpu, 0) * 1000
-	mem := math.Max(memStats.UsageRss-offlineMem, 0)
+		cpuStats.CpuTotal, memStats.UsageRss, cpuStats.CpuOfflineTotal, memStats.OfflineTotal)
+	milliCPU := math.Max(cpuStats.CpuTotal-cpuStats.CpuOfflineTotal, 0) * 1000
+	mem := math.Max(memStats.UsageRss-memStats.UsageTotal, 0)
 	return milliCPU, mem, nil
 }
 
