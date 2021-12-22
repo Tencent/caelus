@@ -265,7 +265,9 @@ func (g *GInit) GetMinCapacity() *global.NMCapacity {
 	}
 	values, err := g.GetProperty(YarnSite, keys, false)
 	if err != nil {
-		klog.Fatalf("request min capacity err: %v", err)
+		klog.Errorf("request min capacity err: %v", err)
+		// just return the default value
+		return cap
 	}
 
 	if values["yarn.scheduler.minimum-allocation-mb"] != "" {
