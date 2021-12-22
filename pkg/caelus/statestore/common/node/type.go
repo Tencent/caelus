@@ -132,8 +132,9 @@ func (nrs *NodeResourceState) GetTags() []string {
 // NodeCpu record cpu state for node
 type NodeCpu struct {
 	// just for compute core usage per second
-	state     []cpu.TimesStat `structs:"state,omitempty"`
-	timestamp time.Time       `structs:"timestamp,omitempty"`
+	state        []cpu.TimesStat `structs:"state,omitempty"`
+	timestamp    time.Time       `structs:"timestamp,omitempty"`
+	offlineUsage uint64          `structs:"offline_usage,omitempty"`
 
 	// core used per second
 	CpuTotal   float64   `structs:"cpu_total"`
@@ -142,6 +143,7 @@ type NodeCpu struct {
 
 	CpuStealTotal   float64   `structs:"cpu_steal_total"`
 	CpuStealPerCore []float64 `structs:"cpu_steal_per_core"`
+	CpuOfflineTotal float64   `structs:"cpu_offline_total"`
 }
 
 // GetValue get node cpu resource value
@@ -213,6 +215,8 @@ type NodeMemory struct {
 	UsageCache float64 `structs:"memory_usage_cache"`
 	UsageRss   float64 `structs:"memory_usage_rss"`
 	Available  float64 `structs:"memory_available"`
+
+	OfflineTotal float64 `structs:"memory_offline_total"`
 }
 
 // GetValue get memory resource value
