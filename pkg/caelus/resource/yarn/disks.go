@@ -57,6 +57,8 @@ var (
 type DiskManager struct {
 	types.YarnDisksConfig
 	availablePartitions []PartitionInfo
+	// indicating if all partitions' size are too small to be used
+	spaceLimited bool
 	// just support yarn on k8s
 	k8sClient kubernetes.Interface
 	// cleaningLock is used to lock when cleaning disk space
@@ -77,11 +79,13 @@ type PartitionInfo struct {
 
 // NewDiskManager create a new disk manager instance
 func NewDiskManager(config types.YarnDisksConfig, k8sClient kubernetes.Interface) *DiskManager {
+	availablePartitions, spaceLimited := getAvailablePartitions(util.InHostNamespace, config.MultiDiskDisable,
+		config.DiskMinCapacityGb)
 	return &DiskManager{
-		YarnDisksConfig: config,
-		availablePartitions: getAvailablePartitions(util.InHostNamespace, config.MultiDiskDisable,
-			config.DiskMinCapacityGb),
-		k8sClient: k8sClient,
+		YarnDisksConfig:     config,
+		availablePartitions: availablePartitions,
+		spaceLimited:        spaceLimited,
+		k8sClient:           k8sClient,
 	}
 }
 
@@ -118,8 +122,9 @@ func (d *DiskManager) DiskSpaceToCores() (*resource.Quantity, error) {
 	return diskSpaceCores, nil
 }
 
-// GetLocalDirs output yarn.nodemanager.local-dirs and yarn.nodemanager.log-dirs.
-func (d *DiskManager) GetLocalDirs() (localDirs []string, logDirs []string) {
+// GetLocalDirs output yarn.nodemanager.local-dirs and yarn.nodemanager.log-dirs, and a boolean value to indicate if
+// all partitions' size are too small
+func (d *DiskManager) GetLocalDirs() (localDirs []string, logDirs []string, spaceLimited bool) {
 	// this may be waiting for a long time until full disk space has been released
 	d.cleaningLock.Lock()
 	defer d.cleaningLock.Unlock()
@@ -138,7 +143,7 @@ func (d *DiskManager) GetLocalDirs() (localDirs []string, logDirs []string) {
 		logDirs = append(logDirs, p.LogPath)
 	}
 
-	return localDirs, logDirs
+	return localDirs, logDirs, d.spaceLimited
 }
 
 // checkDiskSpace check if the disk space is full, and may restart the offline pod and clear paths.
@@ -204,8 +209,11 @@ func (d *DiskManager) getClearPaths() (restartNMPod bool, clearPaths map[string]
 		diskSpaceStat[p.MountPoint] = pStat
 
 		freeGb := pStat.FreeSize / types.DiskUnit
-
-		if freeGb < d.SpaceCheckReservedGb || pStat.FreeSize < int64(d.SpaceCheckReservedPercent*float64(pStat.TotalSize)) {
+		// SpaceCheckReservedGb and SpaceCheckReservedPercent could not be nil at the same time
+		// the path, which need to clear, must be less than the reserved Gb and percent value
+		if (d.SpaceCheckReservedGb == nil || freeGb < *d.SpaceCheckReservedGb) &&
+			(d.SpaceCheckReservedPercent == nil ||
+				pStat.FreeSize < int64(*d.SpaceCheckReservedPercent*float64(pStat.TotalSize))) {
 			clearPaths[p.MountPoint] = freeGb
 			if dirIsDataPath(p.MountPoint) {
 				dataIsFull = true
@@ -318,31 +326,36 @@ func (d *DiskManager) cleanDiskSpace(fullMountPoints map[string]int64) {
 }
 
 // getAvailablePartitions get available partitions for nodemanager
-func getAvailablePartitions(hostNamespace bool, multiDiskDisable bool, diskMinCapGb int64) []PartitionInfo {
-	partInfos := []PartitionInfo{}
+// the function will return available partitions and a boolean value, indicating whether partitions size is too small
+func getAvailablePartitions(hostNamespace bool, multiDiskDisable bool, diskMinCapGb int64) (
+	partInfos []PartitionInfo, spaceLimited bool) {
 	if !multiDiskDisable {
 		// get extra multi disks info without /data
 		// if the nodemanager need multi disks, the pod should mount host path "/" to container as "/rootfs"
-		partInfos = probeLocalAndLogDirs(hostNamespace, diskMinCapGb)
+		partInfos, spaceLimited = probeLocalAndLogDirs(hostNamespace, diskMinCapGb)
 		klog.V(2).Infof("multi disks enabled for yarn, available partitions: %+v", partInfos)
 	} else {
 		klog.V(2).Infof("multi disks disabled for yarn, will use /data path")
 	}
 	if len(partInfos) == 0 {
 		klog.V(2).Infof("extra partitions disk is empty, adding /data info")
-		dataPartInfo, err := generatePartitionForDataPath(hostNamespace)
+		dataPartInfo, dataSpaceLimited, err := generatePartitionForDataPath(hostNamespace, diskMinCapGb)
 		if err != nil {
 			klog.Errorf("generate /data partition info failed: %v", err)
 		} else {
 			partInfos = append(partInfos, dataPartInfo)
 		}
+		spaceLimited = dataSpaceLimited
+	}
+	if spaceLimited {
+		klog.Errorf("node has little disk space(<%dGi)", diskMinCapGb)
 	}
 
-	return partInfos
+	return partInfos, spaceLimited
 }
 
 // probeLocalAndLogDirs check extra paths from /data1....., not containing /data
-func probeLocalAndLogDirs(hostNamespace bool, diskSize int64) (partInfos []PartitionInfo) {
+func probeLocalAndLogDirs(hostNamespace bool, diskMinCapGb int64) (partInfos []PartitionInfo, spaceLimited bool) {
 	dirWithRegx := dirRegexHost
 	if !hostNamespace {
 		dirWithRegx = dirRegexContainer
@@ -359,6 +372,7 @@ func probeLocalAndLogDirs(hostNamespace bool, diskSize int64) (partInfos []Parti
 		return
 	}
 
+	spaceLimited = true
 	for _, partition := range partitions {
 		stats, err := getDiskPartitionStats(partition)
 		if err != nil {
@@ -366,10 +380,11 @@ func probeLocalAndLogDirs(hostNamespace bool, diskSize int64) (partInfos []Parti
 			continue
 		}
 		// select the mount point which is big enough.
-		if stats.TotalSize < diskSize*types.DiskUnit {
+		if stats.TotalSize < diskMinCapGb*types.DiskUnit {
 			klog.Warningf("path(%s) has little disk space(%d), just ignore", partition, stats.TotalSize)
 			continue
 		}
+		spaceLimited = false
 
 		// create local data directory
 		localDir := path.Join(partition, subLocalDir)
@@ -391,12 +406,12 @@ func probeLocalAndLogDirs(hostNamespace bool, diskSize int64) (partInfos []Parti
 		})
 	}
 
-	return partInfos
+	return partInfos, spaceLimited
 }
 
 // generatePartitionForDataPath generate partition info for the /data path,
 // there is something special for the /data, such as disk space size and local directory for nodemanager
-func generatePartitionForDataPath(hostNamespace bool) (PartitionInfo, error) {
+func generatePartitionForDataPath(hostNamespace bool, diskMinCapGb int64) (PartitionInfo, bool, error) {
 	dataMountPoint := dataPartitionInHost
 	if !hostNamespace {
 		dataMountPoint = dataPartitionInContainer
@@ -405,13 +420,19 @@ func generatePartitionForDataPath(hostNamespace bool) (PartitionInfo, error) {
 	pStat, err := getDiskPartitionStats(dataMountPoint)
 	if err != nil {
 		klog.Errorf("get /data partition state(%s) failed: %v", dataMountPoint, err)
-		return PartitionInfo{}, err
+		return PartitionInfo{}, false, err
 	}
 
 	// /data has been mounted in emptydir type, so just set /data/yarnenv/local and /data/yarnenv/container-logs.
 	dataPartition := "/data"
 	localPath := path.Join(dataPartition, subLocalDir)
 	logPath := path.Join(dataPartition, subLogDir)
+
+	spaceLimited := false
+	// check if the partition size is too small
+	if pStat.TotalSize < diskMinCapGb*types.DiskUnit {
+		spaceLimited = true
+	}
 
 	// for /data path, online jobs will also use, so we just give half the space to offline jobs.
 	// maybe freeSize is better, while this may be always changing.
@@ -422,7 +443,7 @@ func generatePartitionForDataPath(hostNamespace bool) (PartitionInfo, error) {
 		TotalSize:  totalSize,
 		LocalPath:  localPath,
 		LogPath:    logPath,
-	}, nil
+	}, spaceLimited, nil
 }
 
 // getDiskPartitions output all mounted partitions based on regexPattern
