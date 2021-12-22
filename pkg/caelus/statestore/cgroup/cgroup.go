@@ -43,6 +43,7 @@ import (
 	"k8s.io/klog"
 )
 
+var machineCores = 0
 var cgroupStatsExample = &CgroupStats{}
 var _ CgroupStore = &cgroupStoreManager{}
 
@@ -350,7 +351,7 @@ func (c *cgroupStoreManager) listCgroupStats(updateStats, recur bool, cgPaths []
 				continue
 			}
 
-			cgStat := generateCgroupStats(&v, ref)
+			cgStat := c.generateCgroupStats(&v, ref)
 			if cg, ok := cgs[key]; ok {
 				cgStat.CpuUsage += cg.CpuUsage
 				cgStat.NrCpuThrottled += cg.NrCpuThrottled
@@ -370,10 +371,16 @@ func (c *cgroupStoreManager) listCgroupStats(updateStats, recur bool, cgPaths []
 	return cgs, nil
 }
 
-func generateCgroupStats(v *cadvisorapiv2.ContainerInfo, ref *CgroupRef) *CgroupStats {
+func (c *cgroupStoreManager) generateCgroupStats(v *cadvisorapiv2.ContainerInfo, ref *CgroupRef) *CgroupStats {
 	cgSt := &CgroupStats{
 		Ref:       ref,
 		Timestamp: v.Stats[1].Timestamp,
+	}
+	if machineCores == 0 {
+		machineInfo, err := c.cadvisorManager.MachineInfo()
+		if err == nil && machineInfo != nil {
+			machineCores = machineInfo.NumCores
+		}
 	}
 
 	generateCgroupStatsCpu(v, cgSt)
@@ -390,6 +397,18 @@ func generateCgroupStatsCpu(v *cadvisorapiv2.ContainerInfo, cgSt *CgroupStats) {
 		total := v.Stats[1].Cpu.Usage.Total - v.Stats[0].Cpu.Usage.Total
 		interval := v.Stats[1].Timestamp.Sub(v.Stats[0].Timestamp)
 		cgSt.CpuUsage = float64(int(float64(total)*100/float64(interval.Nanoseconds())+0.5)) / 100
+		if cgSt.CpuUsage < 0 {
+			cgSt.CpuUsage = 0
+			klog.Warningf("invalid value when calculating cpu usage, total: %f, %d",
+				total, interval.Nanoseconds())
+			return
+		}
+		if machineCores != 0 && cgSt.CpuUsage > float64(machineCores) {
+			cgSt.CpuUsage = float64(machineCores)
+			klog.Warningf("value too big when calculating cpu usage, just set total cores(%d), total: %f, %d",
+				total, interval.Nanoseconds(), machineCores)
+			return
+		}
 		nrThrottled := v.Stats[1].Cpu.CFS.ThrottledPeriods - v.Stats[0].Cpu.CFS.ThrottledPeriods
 		nrPeriods := v.Stats[1].Cpu.CFS.Periods - v.Stats[0].Cpu.CFS.Periods
 		if nrPeriods > 0 {
