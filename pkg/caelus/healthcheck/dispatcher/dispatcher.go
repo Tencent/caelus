@@ -59,17 +59,19 @@ func (d *Dispatcher) HandleActionResult(acRet *action.ActionResult) error {
 		unschedule = unschedule || un
 	}
 
-	if unschedule {
-		err = d.resourceManager.DisableOfflineSchedule()
-		if err != nil {
-			// just warning
-			klog.Errorf("disable offline schedule err: %v", err)
-		}
-	} else {
-		err = d.resourceManager.EnableOfflineSchedule()
-		if err != nil {
-			// just warning
-			klog.Errorf("enable offline schedule err: %v", err)
+	if d.resourceManager != nil {
+		if unschedule {
+			err = d.resourceManager.DisableOfflineSchedule()
+			if err != nil {
+				// just warning
+				klog.Errorf("disable offline schedule err: %v", err)
+			}
+		} else {
+			err = d.resourceManager.EnableOfflineSchedule()
+			if err != nil {
+				// just warning
+				klog.Errorf("enable offline schedule err: %v", err)
+			}
 		}
 	}
 
