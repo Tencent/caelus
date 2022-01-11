@@ -112,7 +112,7 @@ func (p *localPredict) getRecentOnlineResource() (float64, float64, error) {
 	klog.V(4).Infof("predict sample, total(%f, %f), offline(%f, %f)",
 		cpuStats.CpuTotal, memStats.UsageRss, cpuStats.CpuOfflineTotal, memStats.OfflineTotal)
 	milliCPU := math.Max(cpuStats.CpuTotal-cpuStats.CpuOfflineTotal, 0) * 1000
-	mem := math.Max(memStats.UsageRss-memStats.UsageTotal, 0)
+	mem := math.Max(memStats.UsageRss-memStats.OfflineTotal, 0)
 	return milliCPU, mem, nil
 }
 
