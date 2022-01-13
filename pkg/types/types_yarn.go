@@ -68,6 +68,11 @@ type ContainerState struct {
 	StartTime time.Time `json:"start_time"`
 }
 
+// NMDiskPartition show all disk partitions name
+type NMDiskPartition struct {
+	PartitionsName []string `json:"partitionsName"`
+}
+
 // NMContainer show container info
 type NMContainer struct {
 	ID                  string    `json:"id"`

@@ -39,10 +39,11 @@ import (
 )
 
 const (
-	defaultUser = "root"
-	basePath    = "/v1/nm"
-	stateNMUp   = "UP"
-	stateNMDown = "DOWN"
+	defaultUser      = "root"
+	basePath         = "/v1/nm"
+	stateNMUp        = "UP"
+	stateNMDown      = "DOWN"
+	defaultMinDiskGb = 100
 
 	// EnvPidFile show nodemanager pid file
 	EnvPidFile = "PID_FILE"
@@ -50,6 +51,8 @@ const (
 	EnvCgroupPath = "CGROUP_PATH"
 	// EnvHadoopYarnHomd show nodemanager working path
 	EnvHadoopYarnHomd = "HADOOP_YARN_HOME"
+	// EnvDiskMinCap show disk min capacity limits
+	EnvDiskMinCap = "DISK_MIN_CAP"
 	// EnvUser show nodemanager working user in linux
 	EnvUser = "USER"
 	// EnvGroup show nodemanager working group in linux
@@ -93,6 +96,8 @@ func RegisterNMOperatorService(enableCadvisor bool, container *restful.Container
 	ws.Route(ws.POST("/capacity/update").To(op.UpdateCapacity))
 	ws.Route(ws.POST("/capacity/update/force").To(op.ForceUpdateCapacity))
 
+	// output all disk partitions for yarn local directory
+	ws.Route(ws.GET("/diskpartitions").To(op.DiskPartitions))
 	container.Add(ws)
 }
 
@@ -135,7 +140,19 @@ func NewNMOperator(enableCadvisor bool) *NMOperator {
 	if len(yarnHome) == 0 {
 		klog.Errorf("env %s is nil", EnvHadoopYarnHomd)
 	}
-
+	diskMinCap := os.Getenv(EnvDiskMinCap)
+	diskMinCapGb, err := strconv.ParseInt(diskMinCap, 10, 64)
+	if err != nil {
+		klog.Errorf("parse disk min capacity failed, using default value(%d): %v", defaultMinDiskGb, err)
+		diskMinCapGb = defaultMinDiskGb
+	}
+	// if the NM using only one disk partition, and the disk space is too small, we will set NM as unhealthy
+	localDirs := util.GetYarnLocalDirs()
+	if len(localDirs) == 1 {
+		if err := util.JudgePartitionCapForDataPath(diskMinCapGb, localDirs[0]); err != nil {
+			klog.Fatalf("judge dataPath partition capacity err: %v", err)
+		}
+	}
 	return &NMOperator{
 		user:             user,
 		group:            group,
@@ -551,6 +568,24 @@ func (n *NMOperator) updateNodeCapacity(request *restful.Request, response *rest
 	}
 
 	response.WriteHeader(http.StatusOK)
+}
+
+// DiskPartitions output all yarn disk partitions
+func (n *NMOperator) DiskPartitions(request *restful.Request, response *restful.Response) {
+	klog.Info("get disk partitions name")
+	diskPartitions, err := util.GetDiskPartitionsName()
+	if err != nil {
+		msg := fmt.Sprintf("get disk partitions err: %v", err)
+		klog.Error(msg)
+		response.WriteServiceError(http.StatusInternalServerError,
+			restful.NewError(http.StatusInternalServerError, msg))
+		return
+	}
+
+	nmDiskPartition := &global.NMDiskPartition{
+		PartitionsName: diskPartitions,
+	}
+	response.WriteAsJson(nmDiskPartition)
 }
 
 // container_e03_1505269670687_0001_01_000001 ->

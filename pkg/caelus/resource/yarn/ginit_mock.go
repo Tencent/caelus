@@ -113,3 +113,8 @@ func (fg *fakeGinit) EnableSchedule() error {
 func (fg *fakeGinit) UpdateNodeCapacity(capacity *global.NMCapacity, force bool) error {
 	panic("implement me")
 }
+
+// GetDiskPartitions get all disk partitions name
+func (fg *fakeGinit) GetDiskPartitions() ([]string, error) {
+	panic("implement me")
+}

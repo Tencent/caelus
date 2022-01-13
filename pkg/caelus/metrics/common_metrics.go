@@ -16,10 +16,10 @@
 package metrics
 
 import (
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/tencent/caelus/pkg/caelus/types"
 	"github.com/tencent/caelus/pkg/caelus/util"
-
-	"github.com/prometheus/client_golang/prometheus"
+	global "github.com/tencent/caelus/pkg/types"
 	"k8s.io/api/core/v1"
 )
 
@@ -163,7 +163,7 @@ func OnlineJobsMetrics(jobName string, metrics map[string]float64) {
 }
 
 // DiskSpaceMetrics record disk space metrics data
-func DiskSpaceMetrics(diskStats map[string]*types.DiskPartitionStats) {
+func DiskSpaceMetrics(diskStats map[string]*global.DiskPartitionStats) {
 	nodeName := util.NodeIP()
 	diskSpaceMetric := totalMetrics[metricsDiskSpace].(*prometheus.GaugeVec)
 	for mountpoint, stat := range diskStats {
