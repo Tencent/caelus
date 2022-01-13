@@ -170,7 +170,6 @@ func (d *diskCpuAdapter) ResourceAdapt(resList v1.ResourceList) bool {
 	if d.disk.RatioToCore == nil {
 		return compareAndReplaceMinCapacity(resList, d.ginit.GetMinCapacity)
 	}
-
 	diskCores, err := d.disk.DiskSpaceToCores()
 	if err != nil {
 		klog.Errorf("disk space to cpus err: %v", err)
@@ -188,6 +187,7 @@ func (d *diskCpuAdapter) ResourceAdapt(resList v1.ResourceList) bool {
 		cpu.Sub(cpu)
 	}
 	metrics.NodeResourceMetricsReset(v1.ResourceList{v1.ResourceCPU: cpu}, metrics.NodeResourceTypeOfflineDisks)
+
 	klog.V(4).Infof("sync node resource, after disk cores: %+v", resList)
 
 	return compareAndReplaceMinCapacity(resList, d.ginit.GetMinCapacity)

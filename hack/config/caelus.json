@@ -36,15 +36,7 @@
       "properties": {},
       "disks": {
         "ratio_to_core": 50,
-        "multi_disk_disable": true,
-        "disk_min_capacity_gb": 500,
-        "space_check_enabled": true,
-        "space_check_period": "10m",
-        "space_check_reserved_gb": 50,
-        "space_check_reserved_percent": 0.2,
-        "space_clean_disable": false,
-        "space_clean_just_data": false,
-        "offline_exited_clean_delay": "25m"
+        "disable_scheduler": true
       }
     },
     "silence": {

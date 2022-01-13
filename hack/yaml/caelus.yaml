@@ -86,6 +86,7 @@ data:
           "properties": {},
           "disks": {
             "ratio_to_core": 50,
+<<<<<<< HEAD
             "multi_disk_disable": true,
             "disk_min_capacity_gb": 500,
             "space_check_enabled": true,
@@ -95,6 +96,9 @@ data:
             "space_clean_disable": false,
             "space_clean_just_data": false,
             "offline_exited_clean_delay": "25m"
+=======
+            "disable_scheduler": true
+>>>>>>> 68e445e... Reconstruction of multi-disk management
           },
           "cpu_over_commit": {
             "enable": false,

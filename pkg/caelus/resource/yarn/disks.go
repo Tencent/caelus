@@ -18,53 +18,43 @@ package yarn
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
-	"path/filepath"
-	"regexp"
+	"strconv"
 	"strings"
-	"sync"
-	"syscall"
 	"time"
 
 	"github.com/tencent/caelus/pkg/caelus/alarm"
 	"github.com/tencent/caelus/pkg/caelus/metrics"
 	"github.com/tencent/caelus/pkg/caelus/types"
 	"github.com/tencent/caelus/pkg/caelus/util"
+	global "github.com/tencent/caelus/pkg/types"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 )
 
 var (
-	// dataPartition is just for data path
-	// the path is prepared for nodemanager, and you should change the partition name as your own needs
-	dataPartitionInHost      = "/data"
-	dataPartitionInContainer = types.RootFS + "/data"
-
-	// you should change the regex as your own needs
-	dirRegexHost      = "^/data[1-9]$"
-	dirRegexContainer = "^" + types.RootFS + "/data[1-9]$"
-
 	diskSpaceCores *resource.Quantity
+
+	// DiskSpaceLimited is the temporary code for old NM image, and will drop in feature
+	DiskSpaceLimited bool
 )
 
 // DiskManager describe disk manager options for yarn
 type DiskManager struct {
 	types.YarnDisksConfig
 	availablePartitions []PartitionInfo
-	// indicating if all partitions' size are too small to be used
-	spaceLimited bool
 	// just support yarn on k8s
 	k8sClient kubernetes.Interface
-	// cleaningLock is used to lock when cleaning disk space
-	cleaningLock sync.Mutex
 	// existTimestamp show the timestamp when pod is not ready
 	existTimestamp *time.Time
+	// ginit group the options for contracting with nodemanager
+	ginit GInitInterface
+	// firstCheck means firstly to check disks
+	firstCheck bool
 }
 
 // PartitionInfo describe directory info on partition
@@ -78,26 +68,25 @@ type PartitionInfo struct {
 }
 
 // NewDiskManager create a new disk manager instance
-func NewDiskManager(config types.YarnDisksConfig, k8sClient kubernetes.Interface) *DiskManager {
-	availablePartitions, spaceLimited := getAvailablePartitions(util.InHostNamespace, config.MultiDiskDisable,
-		config.DiskMinCapacityGb)
-	return &DiskManager{
-		YarnDisksConfig:     config,
-		availablePartitions: availablePartitions,
-		spaceLimited:        spaceLimited,
-		k8sClient:           k8sClient,
+func NewDiskManager(config types.YarnDisksConfig, k8sClient kubernetes.Interface, ginit GInitInterface) *DiskManager {
+	d := &DiskManager{
+		YarnDisksConfig: config,
+		k8sClient:       k8sClient,
+		ginit:           ginit,
 	}
+	d.fillAvailablePartitions()
+
+	return d
 }
 
 // Run start disk manager instance
 func (d *DiskManager) Run(stopCh <-chan struct{}) {
-	if !d.SpaceCheckEnabled {
-		klog.V(2).Infof("disk space check not enabled for yarn")
-		return
+	if d.DisableScheduler {
+		go wait.Until(d.checkDiskSpace, d.SpaceCheckPeriod.TimeDuration(), stopCh)
+		klog.V(2).Infof("disk space check started for yarn")
+	} else {
+		klog.V(2).Infof("disk space check disabled for yarn")
 	}
-
-	go wait.Until(d.checkDiskSpace, d.SpaceCheckPeriod.TimeDuration(), stopCh)
-	klog.V(2).Infof("disk space check started for yarn")
 }
 
 // DiskSpaceToCores will check disk size, and output how many cores matching the size,
@@ -106,442 +95,192 @@ func (d *DiskManager) DiskSpaceToCores() (*resource.Quantity, error) {
 	if diskSpaceCores != nil {
 		return diskSpaceCores, nil
 	}
-
 	if len(d.availablePartitions) == 0 {
-		return nil, fmt.Errorf("not found available partitions")
+		// the NM pod may be just started, we need to check again
+		d.fillAvailablePartitions()
+		if len(d.availablePartitions) == 0 {
+			return nil, fmt.Errorf("not found available partitions")
+		}
 	}
-	var totalSize int64 = 0
+
+	var totalSize int64
 	for _, p := range d.availablePartitions {
 		klog.V(4).Infof("partition(%s) disk space state: %+v", p.MountPoint, p.TotalSize)
 		totalSize += p.TotalSize
 	}
 
 	cores := int64(float64(totalSize)/float64(*d.RatioToCore*types.DiskUnit) + 0.5)
-	diskSpaceCores = resource.NewMilliQuantity(cores*types.CpuUnit, resource.DecimalSI)
+	diskSpaceCores = resource.NewMilliQuantity(cores*types.CPUUnit, resource.DecimalSI)
 
 	return diskSpaceCores, nil
 }
 
-// GetLocalDirs output yarn.nodemanager.local-dirs and yarn.nodemanager.log-dirs, and a boolean value to indicate if
-// all partitions' size are too small
-func (d *DiskManager) GetLocalDirs() (localDirs []string, logDirs []string, spaceLimited bool) {
-	// this may be waiting for a long time until full disk space has been released
-	d.cleaningLock.Lock()
-	defer d.cleaningLock.Unlock()
-
-	for _, p := range d.availablePartitions {
-		if _, err := os.Stat(p.LocalPath); os.IsNotExist(err) {
-			klog.Warningf("local path(%s) not found, just creating", p.LocalPath)
-			createLocalDir(p.LocalPath)
-		}
-		if _, err := os.Stat(p.LogPath); os.IsNotExist(err) {
-			klog.Warningf("log path(%s) not found, just creating", p.LogPath)
-			createLocalDir(p.LogPath)
-		}
-
-		localDirs = append(localDirs, p.LocalPath)
-		logDirs = append(logDirs, p.LogPath)
-	}
-
-	return localDirs, logDirs, d.spaceLimited
-}
-
-// checkDiskSpace check if the disk space is full, and may restart the offline pod and clear paths.
+// checkDiskSpace check if the disk space and wil disable schedule if the space is nearly full.
 func (d *DiskManager) checkDiskSpace() {
-	d.cleaningLock.Lock()
-	defer d.cleaningLock.Unlock()
+	var scheduleDisabled bool
+	var keys = []string{
+		"yarn.nodemanager.disk-health-checker.min-free-space-per-disk-mb",
+		"yarn.nodemanager.disk-health-checker.max-disk-utilization-per-disk-percentage",
+		"yarn.nodemanager.disk-health-checker.min-healthy-disks",
+	}
+	values, err := d.ginit.GetProperty(YarnSite, keys, false)
+	if err != nil {
+		klog.Errorf("request disk health checker failed err: %v", err)
+		return
+	}
+	minFreeMb, err := strconv.Atoi(values["yarn.nodemanager.disk-health-checker.min-free-space-per-disk-mb"])
+	if err != nil {
+		klog.Errorf("invalid yarn.nodemanager.disk-health-checker.min-free-space-per-disk-mb: %s",
+			values["yarn.nodemanager.disk-health-checker.min-free-space-per-disk-mb"])
+		return
+	}
+	maxUsedPer, err := strconv.Atoi(values["yarn.nodemanager.disk-health-checker.max-disk-utilization-per-disk-percentage"])
+	if err != nil {
+		klog.Errorf("invalid yarn.nodemanager.disk-health-checker.max-disk-utilization-per-disk-percentage: %s",
+			values["yarn.nodemanager.disk-health-checker.max-disk-utilization-per-disk-percentage"])
+		return
+	}
+	minHealthyPer, err := strconv.ParseFloat(values["yarn.nodemanager.disk-health-checker.min-healthy-disks"], 64)
+	if err != nil {
+		klog.Errorf("invalid yarn.nodemanager.disk-health-checker.min-healthy-disks: %s",
+			values["yarn.nodemanager.disk-health-checker.min-healthy-disks"])
+		return
+	}
 
-	restartNMPod, clearPaths := d.getClearPaths()
-	if restartNMPod {
-		err := d.restartNMPod()
-		if err != nil {
+	if len(d.availablePartitions) == 0 {
+		// the NM pod may be just started, we need to check again
+		d.fillAvailablePartitions()
+		if len(d.availablePartitions) == 0 {
+			klog.Errorf("disk partitions info is empty:%v", err)
 			return
-		}
-		if len(clearPaths) != 0 {
-			d.cleanDiskSpace(clearPaths)
 		}
 	}
 
-	// if offline pod has exited for long time, we should clear disk space
-	if d.OfflineExitedCleanDelay.TimeDuration() != 0 {
-		pod, err := getOfflinePod()
-		if err != nil {
-			klog.Errorf("get offline pod failed when cleaning disk space: %v", err)
-			return
-		}
-		if pod != nil {
-			d.existTimestamp = nil
-			return
-		}
-		if d.existTimestamp == nil {
-			klog.Warningf("offline pod has exited, starting record timestamp")
-			nowTime := time.Now()
-			d.existTimestamp = &nowTime
-			return
-		}
-		if d.existTimestamp.Add(d.OfflineExitedCleanDelay.TimeDuration()).Before(time.Now()) {
-			msg := fmt.Sprintf("offline pod has exited for %v time, starting to clear disk space",
-				d.OfflineExitedCleanDelay.TimeDuration())
-			klog.Warningf(msg)
-			//alarm.SendAlarm(msg)
-			mountPoints := make(map[string]int64)
-			for _, p := range d.availablePartitions {
-				mountPoints[p.MountPoint] = 0
-			}
-			d.cleanDiskSpace(mountPoints)
-		}
-	}
-}
-
-// getClearPaths check if need to restart pod, and return paths which need to clear
-func (d *DiskManager) getClearPaths() (restartNMPod bool, clearPaths map[string]int64) {
-	restartNMPod = false
-	clearPaths = make(map[string]int64)
-
-	dataIsFull := false
-	diskSpaceStat := make(map[string]*types.DiskPartitionStats)
+	healthyDiskNum := 0
 	for _, p := range d.availablePartitions {
-		pStat, err := getDiskPartitionStats(p.MountPoint)
+		pStat, err := global.GetDiskPartitionStats(p.MountPoint)
 		if err != nil {
 			klog.Errorf("get partition state(%v) failed: %v", p, err)
 			continue
 		}
-		diskSpaceStat[p.MountPoint] = pStat
-
-		freeGb := pStat.FreeSize / types.DiskUnit
-		// SpaceCheckReservedGb and SpaceCheckReservedPercent could not be nil at the same time
-		// the path, which need to clear, must be less than the reserved Gb and percent value
-		if (d.SpaceCheckReservedGb == nil || freeGb < *d.SpaceCheckReservedGb) &&
-			(d.SpaceCheckReservedPercent == nil ||
-				pStat.FreeSize < int64(*d.SpaceCheckReservedPercent*float64(pStat.TotalSize))) {
-			clearPaths[p.MountPoint] = freeGb
-			if dirIsDataPath(p.MountPoint) {
-				dataIsFull = true
-			}
-		}
-
-	}
-	metrics.DiskSpaceMetrics(diskSpaceStat)
-	// no paths need to clear, just return
-	if len(clearPaths) == 0 {
-		return
-	}
-
-	msg := fmt.Sprintf("paths(%+v) has little disk space, and ", clearPaths)
-	handleMsg := "disk space cleaning is false, nothing to do"
-	if !d.SpaceCleanDisable {
-		restartNMPod = true
-		handleMsg = "disk space cleaning is true, will restart offline job and clear disk space"
-		if d.SpaceCleanJustData {
-			// just restart pod to release /data path, no need to clear others partitions disk space
-			clearPaths = make(map[string]int64)
-			if dataIsFull {
-				handleMsg = "disk space cleaning is true and just clean /data path, now data path is full, will restart offline pod"
-			} else {
-				restartNMPod = false
-				handleMsg = "disk space cleaning is true and just clean /data path, now data path is not full, nothing to do"
-			}
-		}
-	}
-
-	// send alarm
-	alarm.SendAlarm(msg + handleMsg)
-	klog.V(2).Infof(msg + handleMsg)
-
-	return restartNMPod, clearPaths
-}
-
-// restartOfflinePod will restart nodemanager pod
-func (d *DiskManager) restartNMPod() error {
-	// kill offline pod
-	pod, err := getOfflinePod()
-	if err != nil {
-		klog.Errorf("get offline pod failed when cleaning disk space: %v", err)
-		return err
-	}
-	if pod == nil {
-		klog.Errorf("get no offline pod when cleaning disk space")
-		return fmt.Errorf("no offline pod found")
-	}
-	klog.V(2).Infof("starting to kill offline nodemanager pod: %s-%s", pod.Namespace, pod.Name)
-	options := metav1.NewDeleteOptions(0)
-	err = d.k8sClient.CoreV1().Pods(pod.Namespace).Delete(pod.Name, options)
-	if err != nil {
-		klog.Errorf("kill offline pod(%s-%s) failed when cleaning disk space: %v", pod.Namespace, pod.Name, err)
-		return err
-	}
-	klog.V(2).Infof("offline nodemanager pod(%s-%s) deleted success ", pod.Namespace, pod.Name)
-
-	// waiting until new offline pod is ready, it may generate deleted files when cleaning disk space during pod deleting,
-	// so we just waiting until new pod is ready.
-	err = wait.PollImmediateInfinite(time.Duration(1*time.Second), func() (bool, error) {
-		klog.V(2).Infof("waiting new offline pod when cleaning disk space")
-		newPod, err := getOfflinePod()
-		if err != nil {
-			return false, err
-		}
-		if newPod == nil {
-			return false, nil
-		}
-		// Pending is the temporary phase which may not be catch, so just check Running phase
-		if newPod.Name != pod.Name && newPod.Status.Phase == "Running" {
-			klog.V(2).Infof("new offline nodemanager pod is running: %s-%s", newPod.Namespace, newPod.Name)
-			return true, nil
-		}
-		return false, nil
-	})
-	if err != nil {
-		klog.Errorf("waiting new offline nodemanager pod running failed: %v", err)
-		return err
-	}
-
-	return nil
-}
-
-// cleanDiskSpace clear disk space based on given paths
-func (d *DiskManager) cleanDiskSpace(fullMountPoints map[string]int64) {
-	defer func(start time.Time) {
-		klog.V(2).Infof("cleaning disk space cost: %s", time.Now().Sub(start))
-	}(time.Now())
-
-	// clear disk space
-	for dir := range fullMountPoints {
-		if dirIsDataPath(dir) {
-			klog.V(2).Infof("/data path is full, no need to clear disk space, restart pod is ok")
-			// /data path is mounted in emptydir for nodemanager pod, restart pod will release the space
+		// add buffer size and take action ahead the NM capacity checking
+		if (pStat.FreeSize-d.DiskCapConservativeValue*types.DiskUnit) <= int64(minFreeMb)*types.MemUnit ||
+			float64(pStat.UsedSize+d.DiskCapConservativeValue*types.DiskUnit)/float64(pStat.TotalSize) >=
+				float64(maxUsedPer/100) {
 			continue
 		}
-
-		localDir := path.Join(dir, subLocalDir)
-		klog.V(2).Infof("starting to clear path: %s", localDir)
-		if err := clearDir(localDir); err != nil {
-			klog.Errorf("cleaning path(%s) failed: %v", localDir, err)
-		}
-		logDir := path.Join(dir, subLogDir)
-		klog.V(2).Infof("starting to clear path: %s", logDir)
-		if err := clearDir(logDir); err != nil {
-			klog.Errorf("cleaning path(%s) failed: %v", logDir, err)
-		}
+		healthyDiskNum++
 	}
-}
-
-// getAvailablePartitions get available partitions for nodemanager
-// the function will return available partitions and a boolean value, indicating whether partitions size is too small
-func getAvailablePartitions(hostNamespace bool, multiDiskDisable bool, diskMinCapGb int64) (
-	partInfos []PartitionInfo, spaceLimited bool) {
-	if !multiDiskDisable {
-		// get extra multi disks info without /data
-		// if the nodemanager need multi disks, the pod should mount host path "/" to container as "/rootfs"
-		partInfos, spaceLimited = probeLocalAndLogDirs(hostNamespace, diskMinCapGb)
-		klog.V(2).Infof("multi disks enabled for yarn, available partitions: %+v", partInfos)
+	if healthyDiskNum == 0 || (len(d.availablePartitions) > 1 &&
+		float64(healthyDiskNum-d.DiskNumConservativeValue)/float64(len(d.availablePartitions)) <= minHealthyPer) {
+		if !scheduleDisabled {
+			alarm.SendAlarm("schedule is closing, the reason is that disks is full")
+			klog.V(2).Infof("schedule is closing, the reason is that disks is full")
+			err := d.ginit.DisableSchedule()
+			if err != nil {
+				klog.Errorf("disable yarn schedule err: %v", err)
+				return
+			}
+			scheduleDisabled = true
+			metrics.NodeScheduleDisabled(1)
+		}
 	} else {
-		klog.V(2).Infof("multi disks disabled for yarn, will use /data path")
-	}
-	if len(partInfos) == 0 {
-		klog.V(2).Infof("extra partitions disk is empty, adding /data info")
-		dataPartInfo, dataSpaceLimited, err := generatePartitionForDataPath(hostNamespace, diskMinCapGb)
-		if err != nil {
-			klog.Errorf("generate /data partition info failed: %v", err)
-		} else {
-			partInfos = append(partInfos, dataPartInfo)
+		// if the process restarted, the firstCheck will make sure to recover the schedule state
+		if d.firstCheck || scheduleDisabled {
+			err := d.ginit.EnableSchedule()
+			if err != nil {
+				klog.Errorf("enable yarn schedule err: %v", err)
+				return
+			}
+			scheduleDisabled = false
+			d.firstCheck = false
+			metrics.NodeScheduleDisabled(0)
 		}
-		spaceLimited = dataSpaceLimited
 	}
-	if spaceLimited {
-		klog.Errorf("node has little disk space(<%dGi)", diskMinCapGb)
+}
+func (d *DiskManager) fillAvailablePartitions() {
+	diskPartitions, err := d.ginit.GetDiskPartitions()
+	if err != nil {
+		klog.Errorf("get disk partitions info failed:%v", err)
+		if strings.Contains(err.Error(), "404 Not Found") {
+			// temporary codes for old NM image, and will drop in feature
+			mountPoint := "/data"
+			if !util.InHostNamespace {
+				mountPoint = path.Join(types.RootFS, "/data")
+			}
+			stats, err := global.GetDiskPartitionStats(mountPoint)
+			if err != nil {
+				klog.Errorf("failed to get %s stats: %v", mountPoint, err)
+			} else {
+				d.availablePartitions = []PartitionInfo{{
+					MountPoint: mountPoint,
+					TotalSize:  stats.TotalSize,
+				}}
+				// just the fixed value
+				if stats.TotalSize <= 50*types.DiskUnit {
+					DiskSpaceLimited = true
+				}
+			}
+		}
+		return
 	}
-
-	return partInfos, spaceLimited
+	klog.V(4).Infof("disk partitions is %v", diskPartitions)
+	d.availablePartitions = getPartitionsInfos(diskPartitions)
 }
 
-// probeLocalAndLogDirs check extra paths from /data1....., not containing /data
-func probeLocalAndLogDirs(hostNamespace bool, diskMinCapGb int64) (partInfos []PartitionInfo, spaceLimited bool) {
-	dirWithRegx := dirRegexHost
-	if !hostNamespace {
-		dirWithRegx = dirRegexContainer
+// getPartitionsInfos get mount point and total size for the partitions
+func getPartitionsInfos(diskPartitions []string) []PartitionInfo {
+	var partInfos []PartitionInfo
+	if len(diskPartitions) == 0 {
+		return partInfos
 	}
 
-	partitions, err := getDiskPartitions(dirWithRegx)
+	partitions, err := getMountPoints(diskPartitions)
 	if err != nil {
-		klog.Fatalf("get mount point fail with pattern(%s): %v", dirWithRegx, err)
-		return
+		klog.Fatalf("get mount point failed: %v", err)
+		return nil
 	}
-
-	if len(partitions) == 0 {
-		klog.Warningf("no extra disk paths found!")
-		return
-	}
-
-	spaceLimited = true
+	// get total size for partitions
 	for _, partition := range partitions {
-		stats, err := getDiskPartitionStats(partition)
+		stats, err := global.GetDiskPartitionStats(partition)
 		if err != nil {
 			klog.Errorf("failed to get %s stats: %v", partition, err)
 			continue
 		}
-		// select the mount point which is big enough.
-		if stats.TotalSize < diskMinCapGb*types.DiskUnit {
-			klog.Warningf("path(%s) has little disk space(%d), just ignore", partition, stats.TotalSize)
-			continue
-		}
-		spaceLimited = false
-
-		// create local data directory
-		localDir := path.Join(partition, subLocalDir)
-		if err := createLocalDir(localDir); err != nil {
-			continue
-		}
-
-		// create log directory
-		logDir := path.Join(partition, subLogDir)
-		if err := createLocalDir(logDir); err != nil {
-			continue
-		}
-
 		partInfos = append(partInfos, PartitionInfo{
 			MountPoint: partition,
-			LocalPath:  localDir,
-			LogPath:    logDir,
 			TotalSize:  stats.TotalSize,
 		})
+		klog.V(2).Infof("disk partition %s with total size: %d", partition, stats.TotalSize)
 	}
-
-	return partInfos, spaceLimited
+	return partInfos
 }
 
-// generatePartitionForDataPath generate partition info for the /data path,
-// there is something special for the /data, such as disk space size and local directory for nodemanager
-func generatePartitionForDataPath(hostNamespace bool, diskMinCapGb int64) (PartitionInfo, bool, error) {
-	dataMountPoint := dataPartitionInHost
-	if !hostNamespace {
-		dataMountPoint = dataPartitionInContainer
-	}
-
-	pStat, err := getDiskPartitionStats(dataMountPoint)
-	if err != nil {
-		klog.Errorf("get /data partition state(%s) failed: %v", dataMountPoint, err)
-		return PartitionInfo{}, false, err
-	}
-
-	// /data has been mounted in emptydir type, so just set /data/yarnenv/local and /data/yarnenv/container-logs.
-	dataPartition := "/data"
-	localPath := path.Join(dataPartition, subLocalDir)
-	logPath := path.Join(dataPartition, subLogDir)
-
-	spaceLimited := false
-	// check if the partition size is too small
-	if pStat.TotalSize < diskMinCapGb*types.DiskUnit {
-		spaceLimited = true
-	}
-
-	// for /data path, online jobs will also use, so we just give half the space to offline jobs.
-	// maybe freeSize is better, while this may be always changing.
-	totalSize := pStat.TotalSize / 2
-
-	return PartitionInfo{
-		MountPoint: dataMountPoint,
-		TotalSize:  totalSize,
-		LocalPath:  localPath,
-		LogPath:    logPath,
-	}, spaceLimited, nil
-}
-
-// getDiskPartitions output all mounted partitions based on regexPattern
-func getDiskPartitions(regexPattern string) ([]string, error) {
+// getMountPoints output all mounted partitions based on regexPattern
+func getMountPoints(diskPartitions []string) ([]string, error) {
 	f, err := os.Open("/proc/self/mounts")
 	if err != nil {
 		return []string{}, err
 	}
 	defer f.Close()
 
-	regex := regexp.MustCompile(regexPattern)
-
 	var mPoints []string
 	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		txt := scanner.Text()
-		fields := strings.Split(txt, " ")
-		mp := strings.TrimSpace(fields[1])
-		if regex.MatchString(mp) {
-			mPoints = append(mPoints, mp)
+	for _, diskPartition := range diskPartitions {
+		for scanner.Scan() {
+			txt := scanner.Text()
+			fields := strings.Split(txt, " ")
+			dp := strings.TrimSpace(fields[0])
+			// If it matches the partition, output the first mount point and exit, otherwise
+			// the mount point will be calculated repeatedly
+			if dp == diskPartition {
+				mPoints = append(mPoints, fields[1])
+				break
+			}
 		}
-
 	}
 	if err := scanner.Err(); err != nil {
 		klog.Infof("check /proc/self/mounts err: %v", err)
 	}
 	return mPoints, nil
-}
-
-// getDiskPartitionStats output disk space stats for the partition
-func getDiskPartitionStats(partitionName string) (*types.DiskPartitionStats, error) {
-	stat := syscall.Statfs_t{}
-
-	err := syscall.Statfs(partitionName, &stat)
-	if err != nil {
-		return nil, err
-	}
-
-	dStats := &types.DiskPartitionStats{
-		TotalSize: int64(stat.Blocks) * stat.Bsize,
-		FreeSize:  int64(stat.Bfree) * stat.Bsize,
-	}
-	dStats.UsedSize = dStats.TotalSize - dStats.FreeSize
-
-	return dStats, nil
-}
-
-// createLocalDir create local data and log directory
-func createLocalDir(dirPath string) error {
-	if err := os.MkdirAll(dirPath, 0777); err != nil {
-		if !os.IsExist(err) {
-			klog.Errorf("create directory %s failed, %v", dirPath, err)
-			return err
-		}
-	}
-	if err := os.Chmod(dirPath, 0777); err != nil {
-		klog.Errorf("assign 777 to path(%s) err: %v", dirPath, err)
-		return err
-	}
-
-	return nil
-}
-
-// dirIsDataPath check if the directory is the /data path
-func dirIsDataPath(dir string) bool {
-	if dir == dataPartitionInHost || dir == dataPartitionInContainer {
-		return true
-	}
-
-	return false
-}
-
-// clearDir release disk space based on given directory
-func clearDir(dir string) error {
-	// Remove is dangerous! should check again
-	if !strings.HasSuffix(dir, subLocalDir) && !strings.HasSuffix(dir, subLogDir) {
-		klog.Warningf("path(%s) is not nodemanager path, do not clear", dir)
-		return nil
-	}
-
-	subDirs, err := ioutil.ReadDir(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-	for _, info := range subDirs {
-		fullPath := filepath.Join(dir, info.Name())
-		err = os.RemoveAll(fullPath)
-		if err != nil {
-			// just warning, no need to return error
-			klog.Errorf("remove path(%s) err: %v", fullPath, err)
-		} else {
-			klog.V(4).Infof("remove path(%s) success", fullPath)
-		}
-	}
-	klog.V(2).Infof("path clean finished: %s", dir)
-
-	return nil
 }
