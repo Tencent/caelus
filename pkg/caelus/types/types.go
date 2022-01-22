@@ -48,8 +48,10 @@ const (
 
 	defaultYarnScheduleServerPort = "10010"
 	defaultCheckPointDir          = "/tmp/caeclus"
-	// defaultMinDiskCapacity is nm local-dirs min capacity(unit: Gb).
-	defaultMinDiskCapacity = 100
+
+	// defaultDiskCapConservativeValue is disk capacity conservative value (unit: Gb)
+	defaultDiskCapConservativeValue = 10
+	defaultDiskNumConservativeValue = 1
 
 	AlarmTypeLocal  = "local"
 	AlarmTypeRemote = "remote"
@@ -63,8 +65,8 @@ const (
 	// MemUnit translates Mb to byte
 	MemUnit   = int64(1024 * 1024)
 	MemGbUnit = int64(1024 * 1024 * 1024)
-	// CpuUnit translates milli core
-	CpuUnit = int64(1000)
+	// CPUUnit translates milli core
+	CPUUnit = int64(1000)
 	// DiskUnit translates Gi to btye
 	DiskUnit = int64(1024 * 1020 * 1024)
 
@@ -142,16 +144,6 @@ type Resource struct {
 	CpuPercent    *float64 `json:"-"`
 	MemPercentStr string   `json:"mem_percent"`
 	MemPercent    *float64 `json:"-"`
-}
-
-// DiskPartitionStats show disk space size
-type DiskPartitionStats struct {
-	// TotalSize show total disk size in bytes
-	TotalSize int64
-	// UsedSize show used disk size in bytes
-	UsedSize int64
-	// FreeSize show free disk size in bytes
-	FreeSize int64
 }
 
 // CaelusConfig is the configuration for Caelus
@@ -248,22 +240,16 @@ type TimeRangeOverCommit struct {
 // YarnDisksConfig group disks config
 type YarnDisksConfig struct {
 	// RatioToCore translate disk space to core numbers
-	RatioToCore      *int64 `json:"ratio_to_core"`
-	MultiDiskDisable bool   `json:"multi_disk_disable"`
-	// DiskMinCapacityGb drop disks with little disk space
-	DiskMinCapacityGb int64          `json:"disk_min_capacity_gb"`
-	SpaceCheckEnabled bool           `json:"space_check_enabled"`
-	SpaceCheckPeriod  times.Duration `json:"space_check_period"`
-	// SpaceCheckReservedGb is used for checking disk space, it will start cleaning space if free disk space is less
-	// than SpaceCheckReservedGb
-	SpaceCheckReservedGb      *int64   `json:"space_check_reserved_gb"`
-	SpaceCheckReservedPercent *float64 `json:"space_check_reserved_percent"`
-	SpaceCleanDisable         bool     `json:"space_clean_disable"`
-	// SpaceCleanJustData is enabled, it will just restart nodemanager pod to release /data space, and
-	// do not care other disk partitions
-	SpaceCleanJustData bool `json:"space_clean_just_data"`
-	// OfflineExitedCleanDelay is used to clean nodemanager local or log path when offline pod exited for long time
-	OfflineExitedCleanDelay times.Duration `json:"offline_exited_clean_delay"`
+	RatioToCore *int64 `json:"ratio_to_core"`
+	// DisableScheduler if disk is full whether disable scheduler
+	DisableScheduler bool `json:"disable_scheduler"`
+	// DiskCapConservativeValue if disk free capacity sub diskCapConservativeValue below yarn-site
+	// min-free-space-per-disk-mb,nm will don't support to scheduler
+	DiskCapConservativeValue int64 `json:"disk_cap_conservative_value"`
+	// DiskNumConservativeValue if available disk sub diskNumConservativeValue below min healthy disks
+	// nm will don't support to scheduler
+	DiskNumConservativeValue int            `json:"disk_num_conservative_value"`
+	SpaceCheckPeriod         times.Duration `json:"space_check_period"`
 }
 
 // RoundOffResource is used to format resource quantity,
@@ -586,20 +572,15 @@ func initNodeResourceConfig(config *NodeResourceConfig, taskType *TaskTypeConfig
 		klog.Fatalf("disk ratio to core could not be zero")
 	}
 
-	if config.YarnConfig.Disks.DiskMinCapacityGb == 0 {
-		config.YarnConfig.Disks.DiskMinCapacityGb = defaultMinDiskCapacity
-	}
 	if config.YarnConfig.Disks.SpaceCheckPeriod.Seconds() == 0 {
 		config.YarnConfig.Disks.SpaceCheckPeriod = defaultDiskSpaceCheckPeriod
 	}
-	if config.YarnConfig.Disks.SpaceCheckEnabled {
-		if config.YarnConfig.Disks.SpaceCheckReservedGb == nil &&
-			config.YarnConfig.Disks.SpaceCheckReservedPercent == nil {
-			klog.Fatalf("disk space check is enabled, but either the SpaceCheckReservedGb or" +
-				"the SpaceCheckReservedPercent is assigned")
-		}
+	if config.YarnConfig.Disks.DiskCapConservativeValue == 0 {
+		config.YarnConfig.Disks.DiskCapConservativeValue = defaultDiskCapConservativeValue
 	}
-
+	if config.YarnConfig.Disks.DiskNumConservativeValue == 0 {
+		config.YarnConfig.Disks.DiskNumConservativeValue = defaultDiskNumConservativeValue
+	}
 	its := config.Silence.Periods
 	for i := 0; i < len(its); i++ {
 		if its[i][0] >= its[i][1] {

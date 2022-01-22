@@ -54,6 +54,7 @@ const (
 	nmRequestCapacityUpdate      = "capacityUpdate"
 	nmRequestCapacityForceUpdate = "capacityForceUpdate"
 	nmRequestContainersKill      = "kill"
+	nmRequestDiskPartitions      = "diskPartitions"
 )
 
 // GInitInterface is the interface used to contact with nm operator
@@ -91,6 +92,8 @@ type GInitInterface interface {
 	// UpdateNodeCapacity update nodemanager capacity
 	// Force updating when the node is in schedule disabled state if the force parameter is true
 	UpdateNodeCapacity(capacity *global.NMCapacity, force bool) error
+	// GetDiskPartitions get all disk partitions name
+	GetDiskPartitions() ([]string, error)
 }
 
 // GInit group the options for contracting with nodemanager
@@ -99,17 +102,14 @@ type GInit struct {
 	disableKillIfNormal         bool
 	onlyKillIfIncompressibleRes bool
 	metricsPortChan             chan int
-	disk                        *DiskManager
 }
 
 // NewGInit create client based on given nodemanager address
-func NewGInit(disableKillIfNormal, onlyKillIfIncompressibleRes bool, config types.YarnNodeResourceConfig,
-	diskManager *DiskManager) GInitInterface {
+func NewGInit(disableKillIfNormal, onlyKillIfIncompressibleRes bool, config types.YarnNodeResourceConfig) GInitInterface {
 	return &GInit{
 		disableKillIfNormal:         disableKillIfNormal,
 		onlyKillIfIncompressibleRes: onlyKillIfIncompressibleRes,
 		YarnNodeResourceConfig:      config,
-		disk:                        diskManager,
 	}
 }
 
@@ -144,28 +144,10 @@ func (g *GInit) StartNodemanager() error {
 		g.sendMetricsPort()
 	}
 
-	// set multi local paths
-	localDirs, logDirs, spaceLimited := g.disk.GetLocalDirs()
-	localProperty := make(map[string]string)
-	if len(localDirs) != 0 {
-		localProperty[LocalDirs] = strings.Join(localDirs, ",")
-	}
-	if len(logDirs) != 0 {
-		localProperty[LogDirs] = strings.Join(logDirs, ",")
-	}
-	if len(localProperty) != 0 {
-		err := g.SetProperty(YarnSite, localProperty, false, false)
-		if err != nil {
-			return err
-		}
-	}
+	// DiskSpaceLimited is the temporary code for old NM image, and will drop in feature
 	// if all partitions' size are too small, just set nodemanager as unhealthy by the disk health checker
-	// you should know that new value will override the original value for the disk health checker
-	if spaceLimited {
+	if DiskSpaceLimited {
 		g.Properties["yarn.nodemanager.disk-health-checker.min-free-space-per-disk-mb"] = "10240000"
-		metrics.DiskSpaceLimited(1)
-	} else {
-		metrics.DiskSpaceLimited(0)
 	}
 
 	if !g.EnableYarnQOS {
@@ -621,6 +603,13 @@ func (g *GInit) sendRequest(action string, method string, sendBody, respBody int
 	return nil
 }
 
+// GetDiskPartitions get all disk partitions
+func (g *GInit) GetDiskPartitions() ([]string, error) {
+	nmDiskPartition := &global.NMDiskPartition{}
+	err := g.sendRequest(nmRequestDiskPartitions, "GET", nil, nmDiskPartition)
+	return nmDiskPartition.PartitionsName, err
+}
+
 func newRequest() *gorequest.SuperAgent {
 	client := gorequest.New().Timeout(time.Minute)
 	return client
@@ -650,6 +639,8 @@ func actionURL(action string) (url string, err error) {
 		url = "/v1/nm/capacity/update/force"
 	case nmRequestContainersKill:
 		url = "/v1/nm/kill"
+	case nmRequestDiskPartitions:
+		url = "/v1/nm/diskpartitions"
 	default:
 		err = fmt.Errorf("invalid action: %s", action)
 	}

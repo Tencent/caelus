@@ -43,6 +43,8 @@ const (
 	CoreSiteFile = "core-site.xml"
 	// YarnEnvFile show nodemanager special config file
 	YarnEnvFile = "yarn-env.sh"
+	// LocalDirs is yarn.nodemanager.local-dirs of yarn-site.
+	LocalDirs = "yarn.nodemanager.local-dirs"
 
 	// the NodeManager has minimum requirement
 	minCapacityCores    = "1"
@@ -529,4 +531,9 @@ func GetNodeManagerWebAddress(cacheAddress bool) string {
 	nodemanagerWebAddress = GetConfDataFromFile(YarnSiteFile, "yarn.nodemanager.webapp.address")
 	klog.Infof("nodemanager web address:%s\n", nodemanagerWebAddress)
 	return nodemanagerWebAddress
+}
+
+// GetYarnNodeManagerLocalDirs get localDirs info from yarn-site.yaml
+func GetYarnNodeManagerLocalDirs() string {
+	return GetConfDataFromFile(YarnSiteFile, LocalDirs)
 }

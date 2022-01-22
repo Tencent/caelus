@@ -62,10 +62,8 @@ func newYarnClient(config types.NodeResourceConfig, predictor predict.Interface,
 
 	yarnData := offlineData.(*OfflineYarnData)
 	yarn.AssignPodInformerValue(yarnData.PodInformer)
-	diskManager := yarn.NewDiskManager(config.YarnConfig.Disks, yarnData.Client)
-	ginit := yarn.NewGInit(config.DisableKillIfNormal, config.OnlyKillIfIncompressibleRes,
-		config.YarnConfig, diskManager)
-
+	ginit := yarn.NewGInit(config.DisableKillIfNormal, config.OnlyKillIfIncompressibleRes, config.YarnConfig)
+	diskManager := yarn.NewDiskManager(config.YarnConfig.Disks, yarnData.Client, ginit)
 	// initialize metrics port
 	nmPort, err := ginit.GetNMWebappPort()
 	if err != nil {

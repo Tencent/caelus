@@ -16,6 +16,7 @@
 package util
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
@@ -34,8 +35,12 @@ import (
 
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
 )
+
+// DiskUnit translates Gi to btye
+const DiskUnit = int64(1024 * 1020 * 1024)
 
 // InitCgroup set cgroup related environment
 func InitCgroup(user, group, envCgroupPath string) error {
@@ -273,4 +278,73 @@ func CheckPidAlive(pid int) bool {
 	}
 
 	return true
+}
+
+// GetDiskPartitionsName output all disk partitions name to caelus
+func GetDiskPartitionsName() ([]string, error) {
+	dirs := GetYarnLocalDirs()
+	f, err := os.Open("/proc/self/mounts")
+	if err != nil {
+		return []string{}, err
+	}
+	defer f.Close()
+	diskPartitions := make(sets.String)
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		txt := scanner.Text()
+		fields := strings.Split(txt, " ")
+		for _, dir := range dirs {
+			if strings.HasPrefix(dir, fields[1]) {
+				diskPartitions = diskPartitions.Insert(strings.TrimSpace(fields[0]))
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		klog.Infof("check /proc/self/mounts err: %v", err)
+	}
+	return diskPartitions.List(), nil
+}
+
+// GetYarnLocalDirs get yarn localdirs
+func GetYarnLocalDirs() []string {
+	localDirsStr := hadoop.GetYarnNodeManagerLocalDirs()
+	return strings.Split(localDirsStr, ",")
+}
+
+// JudgePartitionCapForDataPath  if all partitions' size are too small, just set nodemanager as unhealthy by the disk health checker
+// you should know that new value will override the original value for the disk health checker
+func JudgePartitionCapForDataPath(diskMinCapGb int64, localDir string) error {
+	f, err := os.Open("/proc/self/mounts")
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	var mountPoint string
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		txt := scanner.Text()
+		fields := strings.Split(txt, " ")
+		if strings.HasPrefix(localDir, fields[1]) {
+			mountPoint = strings.TrimSpace(fields[1])
+			break
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		klog.Infof("check /proc/self/mounts err: %v", err)
+	}
+	pStat, err := global.GetDiskPartitionStats(mountPoint)
+	if err != nil {
+		klog.Errorf("get partition state(%s) failed: %v", mountPoint, err)
+		return err
+	}
+	// check if the partition size is too small, and giving a large size to make NM unhealthy
+	if pStat.TotalSize < diskMinCapGb*DiskUnit {
+		properties := make(map[string]string)
+		properties["yarn.nodemanager.disk-health-checker.min-free-space-per-disk-mb"] = "10240000"
+		err := hadoop.SetMultipleConfDataToFile(hadoop.YarnSiteFile, properties)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
