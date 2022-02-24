@@ -458,7 +458,7 @@ func (k *k8sClient) getPodUsage(pod *v1.Pod) v1.ResourceList {
 		if err != nil {
 			klog.Errorf("get cgroup for %s state err: %v", cgPath, err)
 		} else {
-			cpuUsage := int64(cgStat.CpuUsage * float64(types.CpuUnit))
+			cpuUsage := int64(cgStat.CpuUsage * float64(types.CPUUnit))
 			cpu.Add(*apires.NewMilliQuantity(cpuUsage, apires.DecimalSI))
 			mem.Add(*apires.NewQuantity(int64(cgStat.MemoryTotalUsage), apires.DecimalSI))
 		}

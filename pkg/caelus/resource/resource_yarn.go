@@ -226,7 +226,7 @@ func (y *yarnClient) updateCapacity(res v1.ResourceList,
 	y.scheduleLock.RUnlock()
 
 	expectCap := &global.NMCapacity{
-		Vcores:   res.Cpu().MilliValue() / types.CpuUnit,
+		Vcores:   res.Cpu().MilliValue() / types.CPUUnit,
 		MemoryMB: res.Memory().Value() / types.MemUnit,
 	}
 	if capIncrease {
