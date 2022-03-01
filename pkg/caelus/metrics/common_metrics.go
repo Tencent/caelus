@@ -131,7 +131,7 @@ func KillCounterInc(offlineType string) {
 // NodeResourceMetricsReset resets node offline resource quantity, the resType should be predict or capacity
 func NodeResourceMetricsReset(res v1.ResourceList, resType string) {
 	nodeName := util.NodeIP()
-	cpu := float64(res.Cpu().MilliValue()) / float64(types.CpuUnit)
+	cpu := float64(res.Cpu().MilliValue()) / float64(types.CPUUnit)
 	mem := float64(int64(float64(res.Memory().Value()/types.MemUnit)/1024*1000)) / 1000
 
 	nodeResourceMetrics := totalMetrics[metricNameNodeResource].(*prometheus.GaugeVec)

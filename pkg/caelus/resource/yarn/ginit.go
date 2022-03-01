@@ -20,7 +20,6 @@ import (
 	"path"
 	"sort"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -221,7 +220,7 @@ func (g *GInit) GetCapacity() (*global.NMCapacity, error) {
 
 	err := g.sendRequest(nmRequestCapacity, "GET", nil, capacity)
 	if err == nil {
-		capacity.Millcores = capacity.Vcores * types.CpuUnit
+		capacity.Millcores = capacity.Vcores * types.CPUUnit
 	}
 	return capacity, err
 }

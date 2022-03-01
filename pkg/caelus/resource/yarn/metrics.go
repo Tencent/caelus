@@ -169,7 +169,7 @@ func (y *YarnMetrics) uploadNodeMetrics() {
 		}
 	}
 	alloc := v1.ResourceList{
-		v1.ResourceCPU:    *resource.NewMilliQuantity(cpu*types.CpuUnit, resource.DecimalSI),
+		v1.ResourceCPU:    *resource.NewMilliQuantity(cpu*types.CPUUnit, resource.DecimalSI),
 		v1.ResourceMemory: *resource.NewQuantity(mem*types.MemUnit, resource.DecimalSI),
 	}
 	metrics.NodeResourceMetricsReset(alloc, metrics.NodeResourceTypeOfflineAllocated)
@@ -181,7 +181,7 @@ func (y *YarnMetrics) uploadNodeMetrics() {
 		cpu = y.metrics.AvailableVCores + y.metrics.AllocatedVCores
 		mem = y.metrics.AvailableGB + y.metrics.AllocatedGB
 		cap := v1.ResourceList{
-			v1.ResourceCPU:    *resource.NewMilliQuantity(cpu*types.CpuUnit, resource.DecimalSI),
+			v1.ResourceCPU:    *resource.NewMilliQuantity(cpu*types.CPUUnit, resource.DecimalSI),
 			v1.ResourceMemory: *resource.NewQuantity(mem*types.MemGbUnit, resource.DecimalSI),
 		}
 		metrics.NodeResourceMetricsReset(cap, metrics.NodeResourceTypeOfflineCapacity)

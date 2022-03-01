@@ -101,11 +101,11 @@ func TestCompareAndReplaceMinCapacity(t *testing.T) {
 
 	for _, tc := range testCases {
 		targetRes := v1.ResourceList{
-			v1.ResourceCPU:    *resource.NewMilliQuantity(tc.vcores*types.CpuUnit, resource.DecimalSI),
+			v1.ResourceCPU:    *resource.NewMilliQuantity(tc.vcores*types.CPUUnit, resource.DecimalSI),
 			v1.ResourceMemory: *resource.NewQuantity(tc.memMb*types.MemUnit, resource.DecimalSI),
 		}
 		expectRes := v1.ResourceList{
-			v1.ResourceCPU:    *resource.NewMilliQuantity(tc.expect.vcores*types.CpuUnit, resource.DecimalSI),
+			v1.ResourceCPU:    *resource.NewMilliQuantity(tc.expect.vcores*types.CPUUnit, resource.DecimalSI),
 			v1.ResourceMemory: *resource.NewQuantity(tc.expect.memMb*types.MemUnit, resource.DecimalSI),
 		}
 
