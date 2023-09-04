@@ -582,9 +582,7 @@ func (c *cgroupPaths) equal(cgs []string) bool {
 
 func (c *cgroupPaths) copy(cgs []string) {
 	newCgs := []string{}
-	for _, cg := range cgs {
-		newCgs = append(newCgs, cg)
-	}
+	newCgs = append(newCgs, cgs...)
 	c.cgroups = newCgs
 }
 

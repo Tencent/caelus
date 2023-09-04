@@ -674,9 +674,7 @@ func initResourceIsolateConfig(config *ResourceIsolateConfig, nodeConfig *Metric
 			config.Iface = f[:index]
 		}
 	}
-	for _, d := range nodeConfig.DiskNames {
-		config.DiskNames = append(config.DiskNames, d)
-	}
+	config.DiskNames = append(config.DiskNames, nodeConfig.DiskNames...)
 
 	// assign task type
 	config.OnlineType = taskType.OnlineType
