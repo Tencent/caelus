@@ -39,7 +39,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (

@@ -28,7 +28,7 @@ import (
 	"github.com/tencent/caelus/pkg/caelus/util"
 
 	"github.com/parnurzeal/gorequest"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var alarmManager *Manager

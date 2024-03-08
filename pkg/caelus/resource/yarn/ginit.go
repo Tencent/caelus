@@ -32,7 +32,7 @@ import (
 	"github.com/parnurzeal/gorequest"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -407,7 +407,7 @@ func (g *GInit) killContainers(expect *global.NMCapacity, conflictingResource v1
 		klog.Errorf("get container stats err: %v", err)
 		contsState = make(map[string]*global.ContainerState)
 	} else {
-		if klog.V(4) {
+		if klog.V(4).Enabled() {
 			klog.Info("newest container stats: ")
 			for cid, state := range contsState {
 				klog.Infof("   cid: %s, state: %+v", cid, state)

@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 /*
  * Copyright (c) 2021 THL A29 Limited, a Tencent company.
  *
@@ -12,8 +15,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-// +build linux
 
 package pmu
 
@@ -267,7 +268,7 @@ import (
 	"time"
 	"unsafe"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (

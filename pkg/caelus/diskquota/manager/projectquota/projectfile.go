@@ -32,7 +32,7 @@ import (
 	"github.com/tencent/caelus/pkg/caelus/types"
 	"github.com/tencent/caelus/pkg/caelus/util"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (

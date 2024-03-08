@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	api "k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var zeroQ = api.MustParse("0")

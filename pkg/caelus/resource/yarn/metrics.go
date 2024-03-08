@@ -34,7 +34,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -73,7 +73,7 @@ func NewYarnMetrics(metricsPort *int, metricsPortChan chan int) *YarnMetrics {
 			[]string{"node", "type"}, nil),
 		nodeStatusDesc: prometheus.NewDesc("caelus_yarn_nm_healthy", "nodemanager node healthy status",
 			[]string{"node"}, nil),
-		client:          gorequest.New().SetDebug(bool(klog.V(4))).Timeout(time.Second * 5),
+		client:          gorequest.New().SetDebug(bool(klog.V(4).Enabled())).Timeout(time.Second * 5),
 		metricsPortChan: metricsPortChan,
 		lastWarning:     time.Now().Add(-warningPeriod),
 		failedCount:     0,

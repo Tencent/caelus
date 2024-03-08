@@ -27,7 +27,7 @@ import (
 
 	"github.com/Knetic/govaluate"
 	"k8s.io/api/core/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // detectorFactory is the wrap function, generating different detectors with same parameter
@@ -364,7 +364,7 @@ func detect(detectors []detection.Detector, metricsValuesFunc metricsValuesFunc,
 		// add metrics values to detector
 		metrics := d.Metrics()
 		vals := metricsValuesFunc(metrics, d.SampleCount(), d.SampleDuration())
-		if klog.V(4) {
+		if klog.V(4).Enabled() {
 			klog.Infof("metrics: %s", metrics)
 			klog.Infof("values : %+v", vals)
 		}

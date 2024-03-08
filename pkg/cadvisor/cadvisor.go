@@ -26,7 +26,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/manager"
 	"github.com/google/cadvisor/utils/sysfs"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func init() {
@@ -70,8 +70,10 @@ type cmanager struct {
 
 // NewCadvisorManager creates a new cadvisor manager instance
 func NewCadvisorManager(cadPram CadvisorParameter, cgroupPrefixs []string) Cadvisor {
-	m, err := manager.New(cadPram.MemCache, cadPram.SysFs, cadPram.MaxHousekeepingInterval,
-		true, cadPram.IncludeMetrics, http.DefaultClient, cgroupPrefixs)
+	allowDynamic := true
+	m, err := manager.New(cadPram.MemCache, cadPram.SysFs,
+		manager.HouskeepingConfig{&cadPram.MaxHousekeepingInterval, &allowDynamic},
+		cadPram.IncludeMetrics, http.DefaultClient, cgroupPrefixs, []string{}, "", 0)
 	if err != nil {
 		klog.Fatalf("cadvisor manager start err: %v", err)
 	}

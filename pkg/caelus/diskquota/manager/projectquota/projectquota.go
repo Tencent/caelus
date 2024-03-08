@@ -71,7 +71,7 @@ import (
 
 	"golang.org/x/sys/unix"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -351,7 +351,7 @@ func (p *projectQuota) findOrCreateBackingDev(targetPath string) (*backingDev, e
 	return backingDevice, nil
 }
 
-//findOrCreateSharedProjectId check if the path already has an shared project id, creating if not.
+// findOrCreateSharedProjectId check if the path already has an shared project id, creating if not.
 func (p *projectQuota) findOrCreateSharedProjectId(targetPath, pathFlag string,
 	groupName string) (quotaID, bool, error) {
 

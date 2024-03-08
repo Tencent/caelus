@@ -42,7 +42,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	cliflag "k8s.io/component-base/cli/flag"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // options show the supported flags

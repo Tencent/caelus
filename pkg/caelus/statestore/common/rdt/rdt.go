@@ -31,7 +31,7 @@ import (
 	cadvisor "github.com/google/cadvisor/utils"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const rdtResourceName = "RDT"

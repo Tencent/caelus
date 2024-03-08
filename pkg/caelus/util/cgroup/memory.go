@@ -96,10 +96,10 @@ func MemoryForceEmpty(pathInRoot string) (dropSupported bool, err error) {
 // SetMemoryMoveImmigrate set memory.move_charge_at_immigrate for the memory cgroup.
 // This file is used to move pages associated with tasks, different values have its owning meaning about what type of
 // pages should be moved, as following:
-//  - 0: disable moving any pages
-//  - 1: moving anonymous pages used by the task
-//  - 2: moving file pages mapped by the task
-//  - 3: moving both anonymous pages and file pages for the task
+//   - 0: disable moving any pages
+//   - 1: moving anonymous pages used by the task
+//   - 2: moving file pages mapped by the task
+//   - 3: moving both anonymous pages and file pages for the task
 func SetMemoryMoveImmigrate(pathInRoot, value string) error {
 	root := GetRoot()
 	return WriteFile([]byte(value), path.Join(root, MemorySubsystem, pathInRoot), memoryMoveImmigrateFile)

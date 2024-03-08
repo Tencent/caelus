@@ -16,17 +16,19 @@
 package cgroup
 
 import (
+	"bufio"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"unsafe"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var cachedCgroupRoot unsafe.Pointer
@@ -40,7 +42,7 @@ func GetRoot() string {
 	if root := (*string)(atomic.LoadPointer(&cachedCgroupRoot)); root != nil {
 		return *root
 	}
-	root, err := cgroups.FindCgroupMountpointDir()
+	root, err := findCgroupMountpointDir()
 	if err != nil {
 		klog.Fatalf("failed to find cgroup mount point dir")
 	}
@@ -50,6 +52,44 @@ func GetRoot() string {
 	}
 	atomic.StorePointer(&cachedCgroupRoot, unsafe.Pointer(&root))
 	return root
+}
+
+// findCgroupMountpointDir is originally existed in old version runc, but removed in new version, so dump code here
+func findCgroupMountpointDir() (string, error) {
+	f, err := os.Open("/proc/self/mountinfo")
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		text := scanner.Text()
+		fields := strings.Split(text, " ")
+		// Safe as mountinfo encodes mountpoints with spaces as \040.
+		index := strings.Index(text, " - ")
+		postSeparatorFields := strings.Fields(text[index+3:])
+		numPostFields := len(postSeparatorFields)
+
+		// This is an error as we can't detect when the mount is for "cgroup"
+		if numPostFields == 0 {
+			return "", fmt.Errorf("Found no fields post '-' in %q", text)
+		}
+
+		if postSeparatorFields[0] == "cgroup" {
+			// Check that the mount is properly formated.
+			if numPostFields < 3 {
+				return "", fmt.Errorf("Error found less than 3 fields post '-' in %q", text)
+			}
+
+			return filepath.Dir(fields[4]), nil
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return "", err
+	}
+
+	return "", fmt.Errorf("not found")
 }
 
 // GetPids get cgroup pid list

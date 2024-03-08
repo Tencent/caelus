@@ -23,7 +23,7 @@ import (
 	"github.com/tencent/caelus/pkg/caelus/util"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type emptyDirQuotaManager struct {
@@ -124,7 +124,7 @@ func (e *emptyDirQuotaManager) GetVolumes(pod *v1.Pod) (map[string]*types.PathIn
 		}
 	}
 
-	if klog.V(2) {
+	if klog.V(2).Enabled() {
 		formatStr := fmt.Sprintf("\nemptyDir disk quota volumes for pod(%s-%s):\n",
 			pod.Namespace, pod.Name)
 		for name, p := range paths {

@@ -22,7 +22,7 @@ import (
 	"github.com/tencent/caelus/pkg/caelus/util/machine"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const QosMemory = "memory"

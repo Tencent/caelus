@@ -28,7 +28,7 @@ import (
 	"github.com/tencent/caelus/pkg/caelus/types"
 
 	dto "github.com/prometheus/client_model/go"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var _ commonstore.CommonStoreInterface = &MockCommonStore{}

@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -132,12 +132,15 @@ func SupportRdtFunction() *RdtFeature {
 // StaticMonitor monitor for the static duration, and output results
 // monitors format, such as: all:[0,2,4-10] or all:0,2,4
 // if input like all:[0,2], will output:
-//   CORE         IPC      MISSES     LLC[KB]   MBL[MB/s]   MBR[MB/s]
-//     0,2        0.55         12k     36176.0        47.8      1463.1
+//
+//	CORE         IPC      MISSES     LLC[KB]   MBL[MB/s]   MBR[MB/s]
+//	  0,2        0.55         12k     36176.0        47.8      1463.1
+//
 // or will output
-//   CORE         IPC      MISSES     LLC[KB]   MBL[MB/s]   MBR[MB/s]
-//    0        0.55         12k     36176.0        47.8      1463.1
-//    2        0.55         12k     36176.0        47.8      1463.1
+//
+//	CORE         IPC      MISSES     LLC[KB]   MBL[MB/s]   MBR[MB/s]
+//	 0        0.55         12k     36176.0        47.8      1463.1
+//	 2        0.55         12k     36176.0        47.8      1463.1
 func StaticMonitor(monitors []string, monInterval, monTime time.Duration) ([]RdtData, error) {
 	if len(monitors) == 0 {
 		return nil, fmt.Errorf("no monitors found")

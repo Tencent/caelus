@@ -25,7 +25,7 @@ import (
 	"github.com/tencent/caelus/pkg/caelus/types"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // Dispatcher used to send rule checking result to related modules
