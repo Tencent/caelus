@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/autoscaler/vertical-pod-autoscaler/pkg/recommender/model"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // localPredict predicts for online processes on current node.
@@ -74,7 +74,7 @@ func (p *localPredict) Predict() v1.ResourceList {
 	now := time.Now()
 	if p.lastPrintTime1.Add(p.PrintInterval.TimeDuration()).Before(now) {
 		p.lastPrintTime1 = now
-		predictLog = true
+		predictLog = klog.V(0)
 	}
 	// recommended resource
 	recommended := p.recommender.GetRecommendedPodResources(p.statMap)
@@ -129,7 +129,7 @@ func (p *localPredict) addSample() {
 	now := time.Now()
 	if p.lastPrintTime2.Add(p.PrintInterval.TimeDuration()).Before(now) {
 		p.lastPrintTime2 = now
-		addSampleLog = true
+		addSampleLog = klog.V(0)
 	}
 
 	// take kernel usage into account

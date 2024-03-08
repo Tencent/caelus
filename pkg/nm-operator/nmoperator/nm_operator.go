@@ -35,7 +35,7 @@ import (
 
 	"github.com/emicklei/go-restful"
 	"github.com/parnurzeal/gorequest"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -417,7 +417,7 @@ func (n *NMOperator) GetContainers(request *restful.Request, response *restful.R
 		apps[appid] = ""
 	}
 
-	if klog.V(3) {
+	if klog.V(3).Enabled() {
 		var buf bytes.Buffer
 		for app, am := range apps {
 			buf.WriteString(app)
@@ -433,7 +433,7 @@ func (n *NMOperator) GetContainers(request *restful.Request, response *restful.R
 		apps[app] = am
 	}
 
-	if klog.V(3) {
+	if klog.V(3).Enabled() {
 		var buf bytes.Buffer
 		for app, am := range apps {
 			buf.WriteString(app)

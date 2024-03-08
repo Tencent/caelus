@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type diskQuota struct {
@@ -79,7 +79,7 @@ func (d *diskQuota) Run(stop <-chan struct{}) {
 			// remove pods who has not update last time
 			d.removeExitedPods(lastUpdate)
 		}
-		if klog.V(3) {
+		if klog.V(3).Enabled() {
 			d.printVolumes()
 		}
 

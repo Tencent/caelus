@@ -35,7 +35,7 @@ import (
 	"github.com/tencent/caelus/pkg/caelus/util"
 
 	"golang.org/x/sys/unix"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (

@@ -20,7 +20,7 @@ import (
 	"github.com/tencent/caelus/pkg/caelus/types"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // ResourceNotify describe resource monitor by notify method

@@ -27,7 +27,7 @@ import (
 	dockerapi "github.com/docker/engine-api/client"
 	dockertypes "github.com/docker/engine-api/types"
 	"golang.org/x/net/context"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var dockerEndPoint = flag.String("container-runtime-endpoint", "unix:///var/run/docker.sock",

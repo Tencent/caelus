@@ -17,7 +17,7 @@ package netio
 
 import (
 	"github.com/chenchun/ipset/log"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var _ log.LOG = ipsetLog{}

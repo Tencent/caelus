@@ -16,6 +16,7 @@
 package resource
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -38,7 +39,7 @@ import (
 	apires "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var _ clientInterface = (*k8sClient)(nil)
@@ -216,7 +217,7 @@ func (k *k8sClient) syncOfflineResource(offlineList v1.ResourceList) error {
 	}
 
 	for i := 0; i < 3; i++ {
-		_, err := k.Client.CoreV1().Nodes().UpdateStatus(updatedNode)
+		_, err := k.Client.CoreV1().Nodes().UpdateStatus(context.TODO(), updatedNode, metav1.UpdateOptions{})
 		if err == nil {
 			break
 		}
@@ -403,8 +404,8 @@ func (k *k8sClient) chooseOfflinePod(rName v1.ResourceName) (*v1.Pod, v1.Resourc
 	k8sres.OrderedBy(k8sres.SortByPriority,
 		k8sres.SortByResource(usageMap),
 		k8sres.SortByStartTime).Sort(sortedPods)
-	if klog.V(4) {
-		klog.Infof("sorted pods:")
+	if klog.V(4).Enabled() {
+		klog.Info("sorted pods:")
 		for _, p := range sortedPods {
 			klog.Infof("namespace: %s, name: %s", p.Namespace, p.Name)
 		}
@@ -418,7 +419,7 @@ func (k *k8sClient) chooseOfflinePod(rName v1.ResourceName) (*v1.Pod, v1.Resourc
 // killPod do the evict action
 func (k *k8sClient) killPod(chosenPod *v1.Pod) error {
 	klog.Infof("start to kill pod: %s-%s", chosenPod.Namespace, chosenPod.Name)
-	err := k.Client.CoreV1().Pods(chosenPod.Namespace).Evict(&policy.Eviction{
+	err := k.Client.CoreV1().Pods(chosenPod.Namespace).Evict(context.TODO(), &policy.Eviction{
 		ObjectMeta:    chosenPod.ObjectMeta,
 		DeleteOptions: metav1.NewDeleteOptions(0),
 	})

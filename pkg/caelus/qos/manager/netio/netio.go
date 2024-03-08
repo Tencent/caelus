@@ -30,7 +30,7 @@ import (
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/exec"
 )
 
@@ -79,14 +79,14 @@ var (
 
 // ipset config:
 // Name: caelus-offline-eth0
-//Type: hash:ip
-//Revision: 1
-//Header: family inet hashsize 1024 maxelem 65536
-//Size in memory: 184
-//References: 1
-//Members:
-//192.168.2.27
-//192.168.2.28
+// Type: hash:ip
+// Revision: 1
+// Header: family inet hashsize 1024 maxelem 65536
+// Size in memory: 184
+// References: 1
+// Members:
+// 192.168.2.27
+// 192.168.2.28
 type EgressShaper struct {
 	e            exec.Interface
 	ifName       string

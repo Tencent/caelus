@@ -17,7 +17,7 @@ package textfile
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	klog "k8s.io/klog"
+	klog "k8s.io/klog/v2"
 )
 
 const (

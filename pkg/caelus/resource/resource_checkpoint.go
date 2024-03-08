@@ -16,7 +16,7 @@
 package resource
 
 import (
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"time"
 
 	"github.com/tencent/caelus/pkg/caelus/checkpoint"

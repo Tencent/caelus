@@ -19,7 +19,7 @@ import (
 	"sort"
 
 	"github.com/shirou/gopsutil/cpu"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (

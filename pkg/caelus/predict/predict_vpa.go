@@ -25,7 +25,7 @@ import (
 
 	"github.com/parnurzeal/gorequest"
 	"k8s.io/api/core/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -68,6 +68,6 @@ func (p *vpaPredict) Predict() v1.ResourceList {
 func NewVpaPredictOrDie(config types.PredictConfig) Predictor {
 	return &vpaPredict{
 		PredictConfig: config,
-		rpcClient:     gorequest.New().SetDebug(bool(klog.V(4))).Timeout(time.Second * 10),
+		rpcClient:     gorequest.New().SetDebug(bool(klog.V(4).Enabled())).Timeout(time.Second * 10),
 	}
 }

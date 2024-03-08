@@ -24,7 +24,7 @@ import (
 	"github.com/tencent/caelus/pkg/caelus/util/cgroup"
 	"github.com/tencent/caelus/pkg/util/times"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (

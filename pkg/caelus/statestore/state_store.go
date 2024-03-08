@@ -21,7 +21,7 @@ import (
 	"github.com/tencent/caelus/pkg/caelus/types"
 
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // StateStore describe interface for resource state

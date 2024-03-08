@@ -31,7 +31,7 @@ import (
 
 	global "github.com/tencent/caelus/pkg/types"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -460,10 +460,11 @@ func SetAddDelConfig(fileName string, properties map[string]string, add, del boo
 }
 
 // handle property such as:
-//   <property>
-//        <name>yarn.resourcemanager.webapp.address.rm1</name>
-//        <value>${yarn.resourcemanager.hostname.rm1}:8080</value>
-//    </property>
+//
+//	<property>
+//	     <name>yarn.resourcemanager.webapp.address.rm1</name>
+//	     <value>${yarn.resourcemanager.hostname.rm1}:8080</value>
+//	 </property>
 var propertyRegex, _ = regexp.Compile(`\${(.*)}:(.*)`)
 
 // getRealResourceManagerAddress get resource manager address

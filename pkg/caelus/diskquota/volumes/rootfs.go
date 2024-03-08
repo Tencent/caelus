@@ -26,7 +26,7 @@ import (
 	"github.com/tencent/caelus/pkg/caelus/util/runtime/docker"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type rootFsQuotaManager struct {
@@ -87,7 +87,7 @@ func (r *rootFsQuotaManager) GetVolumes(pod *v1.Pod) (map[string]*types.PathInfo
 		}
 	}
 
-	if klog.V(2) {
+	if klog.V(2).Enabled() {
 		formatStr := fmt.Sprintf("\nrootFs disk quota volumes for pod(%s-%s):\n",
 			pod.Namespace, pod.Name)
 		for name, p := range paths {
