@@ -1,9 +1,12 @@
 # Detection configuration
 
-  Caelus dynamically checks abnormalities of various metrics based on [rules.json](../hack/config/rules.json), such as CPU 
+  Caelus dynamically checks abnormalities of various metrics based on CRDs of `RuleCheck` and `CgroupNotify`
+  , such as CPU 
   usage or online latency, to make sure online jobs run normally. Batch jobs will be throttled or even killed if 
   interference detected.
-  This document describes how to configure [rules.json](../hack/config/rules.json)
+  This document describes how to configure these CRDs.
+
+  > **Attention**: Multiple `RuleCheck` or `CgroupNotify` can exist in a cluster, and they will be merged based on the set priority and creation time.
 
 ## 1.Rules
   Rules are used to assign the algorithm to check if the timed metrics have significant fluctuations, such as EWMA, 
@@ -103,7 +106,7 @@ type NodeCpu struct {
 	...
 }
 ```   
-  Node rules example:
+  Node rules json example:
 ```json
       {
         "name": "cpu",
@@ -145,6 +148,46 @@ type NodeCpu struct {
         ]
       }
 ```
+Node rules yaml example:
+```yaml
+apiVersion: caelus.io/v1
+kind: RuleCheck
+metadata:
+  name: caelus-test1
+  namespace: caelus-system
+spec:
+  name: cpu
+  priority: 90
+  nodeSelector:
+    disktype: "ssd"
+  type: node
+  metrics:
+  - cpu_avg
+  checkInterval: 10
+  handleInterval: 10
+  recoverInterval: 15
+  rules:
+  - detects:
+    - name: expression
+      args: |-
+        {
+          "expression": "auto",
+          "warning_count": 10,
+          "warning_duration": "10s"
+        }
+  - actions:
+    - name: adjust
+      args: |-
+        {
+          "resources": [
+            {
+              "step": "1000m"
+            }]
+        }
+    - name: schedule
+      args: |-
+        {}
+```
 
 ### Container rules
   Container rules describe how to detect metrics of container level, the supported metrics could be found from
@@ -158,7 +201,7 @@ type CgroupStats struct {
 }
 ```
 
-  Container rules example:
+  Container rules json example:
 ```json
 {
  "metrics": [
@@ -181,6 +224,34 @@ type CgroupStats struct {
  ]
 }
 ```
+
+Container rules yaml example:
+```yaml
+apiVersion: caelus.io/v1
+kind: RuleCheck
+metadata:
+  name: caelus-test2
+  namespace: caelus-system
+spec:
+  name: cpu
+  priority: 90
+  nodeSelector:
+    disktype: "ssd"
+  type: container
+  metrics:
+  - nr_cpu_throttled
+  checkInterval: 5
+  handleInterval: 10
+  recoverInterval: 15
+  rules:
+  - detects: 
+    - name: expression
+      args: |
+       {
+           "expression": "nr_cpu_throttled > 0"  
+       }
+```
+
 ### App rules
   App rules describe how to detect metrics of app level, the metrics are provided by users themselves, in the way of 
   executable command or http server, the example as flowing: 
@@ -336,3 +407,26 @@ type CgroupStats struct {
   ]
 }
 ```  
+
+Memory cgroup event yaml example:
+```yaml
+apiVersion: caelus.io/v1
+kind: CgroupNotify
+metadata:
+  name: caelus-test1
+  namespace: kube-system
+spec:
+  priority: 90
+  nodeSelector:
+    type: "memory"
+  memory_cgroup:
+    pressures:
+      - cgroups: ["/kubepods/offline"]
+        pressure_level: "low"
+        duration: 3
+        count: 2
+    usages:
+      - cgroups: ["/kubepods/offline/test"]
+        margin_mb: 2048
+        duration: 60000
+```

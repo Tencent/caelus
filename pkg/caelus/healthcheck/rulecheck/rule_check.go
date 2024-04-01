@@ -27,7 +27,7 @@ import (
 	"github.com/tencent/caelus/pkg/caelus/statestore"
 	"github.com/tencent/caelus/pkg/caelus/types"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 )
@@ -53,9 +53,15 @@ func NewManager(config types.RuleCheck, stStore statestore.StateStore, resource 
 	qosManager qos.Manager, conflictMn conflict.Manager, podInformer cache.SharedIndexInformer,
 	predictReserved *types.Resource) *Manager {
 	var checkers []ruleChecker
-	checkers = append(checkers, newContainerHealthChecker(stStore, podInformer, config.ContainerRules))
-	checkers = append(checkers, newNodeHealthChecker(stStore, predictReserved, config.NodeRules))
-	checkers = append(checkers, newAppHealthChecker(stStore, config.AppRules))
+	if len(config.ContainerRules) > 0 {
+		checkers = append(checkers, newContainerHealthChecker(stStore, podInformer, config.ContainerRules))
+	}
+	if len(config.NodeRules) > 0 {
+		checkers = append(checkers, newNodeHealthChecker(stStore, predictReserved, config.NodeRules))
+	}
+	if len(config.AppRules) > 0 {
+		checkers = append(checkers, newAppHealthChecker(stStore, config.AppRules))
+	}
 
 	return &Manager{
 		// default global loop check interval

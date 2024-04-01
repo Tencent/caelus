@@ -18,22 +18,29 @@ package context
 import (
 	"time"
 
+	caelusclient "github.com/tencent/caelus/pkg/generated/clientset/versioned"
+	caelusfake "github.com/tencent/caelus/pkg/generated/clientset/versioned/fake"
+	caelusinformers "github.com/tencent/caelus/pkg/generated/informers/externalversions"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 )
 
-// CaelusContext stores k8s client and factory
+// CaelusContext stores k8s&caelus client and factory
 type CaelusContext struct {
 	Master                  string
 	Kubeconfig              string
 	NodeName                string
 	kubeClient              clientset.Interface
+	caelusClient            caelusclient.Interface
 	nodeFactory, podFactory informers.SharedInformerFactory
+	caelusFactory           caelusinformers.SharedInformerFactory
 }
 
 const (
@@ -45,17 +52,35 @@ const (
 
 // lazyInit build kubernetes client
 func (c *CaelusContext) lazyInit() {
-	if c.kubeClient != nil {
-		return
+	var kubeconfig *rest.Config = nil
+	var err error
+	if c.kubeClient == nil {
+		kubeconfig, err = clientcmd.BuildConfigFromFlags(c.Master, c.Kubeconfig)
+		if err != nil {
+			klog.Warning(err)
+			klog.Warning("fall back to creating fake kube-client")
+			// create a fake client to test caelus without k8s
+			c.kubeClient = fake.NewSimpleClientset()
+		} else {
+			c.kubeClient = clientset.NewForConfigOrDie(kubeconfig)
+		}
+
 	}
-	kubeconfig, err := clientcmd.BuildConfigFromFlags(c.Master, c.Kubeconfig)
-	if err != nil {
-		klog.Warning(err)
-		klog.Warning("fall back to creating fake kube-client")
-		// create a fake client to test caelus without k8s
-		c.kubeClient = fake.NewSimpleClientset()
-	} else {
-		c.kubeClient = clientset.NewForConfigOrDie(kubeconfig)
+
+	// init caelus client
+	if c.caelusClient == nil {
+		err = nil
+		if kubeconfig == nil {
+			kubeconfig, err = clientcmd.BuildConfigFromFlags(c.Master, c.Kubeconfig)
+		}
+		if err != nil {
+			klog.Warning(err)
+			klog.Warning("fall back to creating fake caelus-client")
+			// create a fake client to test caelus without k8s
+			c.caelusClient = caelusfake.NewSimpleClientset()
+		} else {
+			c.caelusClient = caelusclient.NewForConfigOrDie(kubeconfig)
+		}
 	}
 }
 
@@ -63,6 +88,12 @@ func (c *CaelusContext) lazyInit() {
 func (c *CaelusContext) GetKubeClient() clientset.Interface {
 	c.lazyInit()
 	return c.kubeClient
+}
+
+// GetCaelusClient returns caelus client
+func (c *CaelusContext) GetCaelusClient() caelusclient.Interface {
+	c.lazyInit()
+	return c.caelusClient
 }
 
 // GetPodFactory returns pod factory
@@ -77,6 +108,14 @@ func (c *CaelusContext) GetPodFactory() informers.SharedInformerFactory {
 			}))
 	}
 	return c.podFactory
+}
+
+// GetCaelusFactory returns ruleCheck factory
+func (c *CaelusContext) GetCaelusFactory() caelusinformers.SharedInformerFactory {
+	if c.caelusFactory == nil {
+		c.caelusFactory = caelusinformers.NewSharedInformerFactoryWithOptions(c.GetCaelusClient(), 0)
+	}
+	return c.caelusFactory
 }
 
 // GetNodeFactory returns node factory
@@ -104,5 +143,9 @@ func (c *CaelusContext) Run(stop <-chan struct{}) {
 	if c.nodeFactory != nil {
 		c.nodeFactory.Start(stop)
 		c.nodeFactory.WaitForCacheSync(stop)
+	}
+	if c.caelusFactory != nil {
+		c.caelusFactory.Start(stop)
+		c.caelusFactory.WaitForCacheSync(stop)
 	}
 }

@@ -91,7 +91,6 @@ type EWMAArgs struct {
 // HealthCheckConfig is the config for checking health, such as node load or online job interference
 type HealthCheckConfig struct {
 	Disable      bool         `json:"disable"`
-	RuleNodes    []string     `json:"rule_nodes"`
 	RuleCheck    RuleCheck    `json:"rule_check"`
 	CgroupNotify NotifyConfig `json:"cgroup_notify"`
 	// assign the value when initialize
@@ -107,8 +106,10 @@ type RuleCheck struct {
 
 // RuleCheckConfig define the rule config
 type RuleCheckConfig struct {
-	Name    string   `json:"name"`
-	Metrics []string `json:"metrics"`
+	Name         string            `json:"name"`
+	NodeSelector map[string]string `json:"node_selector"`
+	Metrics      []string          `json:"metrics"`
+
 	// CheckInterval describes the interval to trigger detection
 	CheckInterval times.Duration `json:"check_interval"`
 	// HandleInterval describes the interval to handle conflicts after detecting abnormal result
@@ -195,6 +196,12 @@ func InitHealthCheckConfigFunc(nodeMetrics *MetricsNodeConfig,
 		}
 		initNotifyConfig(&config.CgroupNotify)
 		return &config, nil
+	}
+}
+
+func RuleCheckAvailableFunc(nodeMetrics *MetricsNodeConfig, predictReserve *Resource) func(ruleCheck *RuleCheckConfig) {
+	return func(ruleCheck *RuleCheckConfig) {
+		ruleCheckAvailable(ruleCheck, nodeMetrics, predictReserve)
 	}
 }
 

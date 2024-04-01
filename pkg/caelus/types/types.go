@@ -31,7 +31,7 @@ import (
 	"github.com/tencent/caelus/pkg/caelus/util/cgroup"
 	"github.com/tencent/caelus/pkg/util/times"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 )
@@ -40,6 +40,8 @@ import (
 type MetricKind string
 
 const (
+	// Namespace
+	CaelusNamespace = "caelus-system"
 	// TaskType
 	OnlineTypeOnK8s      = "k8s"
 	OnlineTypeOnLocal    = "local"

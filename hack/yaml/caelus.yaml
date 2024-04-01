@@ -1,10 +1,274 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  name: rulechecks.caelus.io
+spec:
+  group: caelus.io
+  names:
+    kind: RuleCheck
+    listKind: RuleCheckList
+    plural: rulechecks
+    singular: rulecheck
+  scope: Cluster
+  versions:
+    - name: v1
+      schema:
+        openAPIV3Schema:
+          description: RuleCheck is a specification for a RuleCheck resource
+          properties:
+            apiVersion:
+              description: |-
+                APIVersion defines the versioned schema of this representation of an object.
+                Servers should convert recognized schemas to the latest internal value, and
+                may reject unrecognized values.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+              type: string
+            kind:
+              description: |-
+                Kind is a string value representing the REST resource this object represents.
+                Servers may infer this from the endpoint the client submits requests to.
+                Cannot be updated.
+                In CamelCase.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: RuleCheckSpec is the spec for a RuleCheck resource
+              properties:
+                checkInterval:
+                  description: CheckInterval describes the interval to trigger detection
+                  format: int64
+                  type: integer
+                handleInterval:
+                  description: HandleInterval describes the interval to handle conflicts
+                    after detecting abnormal result
+                  format: int64
+                  type: integer
+                metrics:
+                  items:
+                    type: string
+                  type: array
+                name:
+                  type: string
+                nodeSelector:
+                  additionalProperties:
+                    type: string
+                  type: object
+                priority:
+                  format: int32
+                  type: integer
+                recoverInterval:
+                  description: RecoverInterval describes the interval to recover conflicts
+                    after detecting normal result
+                  format: int64
+                  type: integer
+                recoverRules:
+                  items:
+                    description: DetectActionRules define detectors and actions
+                    properties:
+                      actions:
+                        items:
+                          description: DetectAction define detector config
+                          properties:
+                            args:
+                              type: string
+                            name:
+                              type: string
+                          required:
+                            - args
+                            - name
+                          type: object
+                        type: array
+                      detects:
+                        items:
+                          description: DetectAction define detector config
+                          properties:
+                            args:
+                              type: string
+                            name:
+                              type: string
+                          required:
+                            - args
+                            - name
+                          type: object
+                        type: array
+                    type: object
+                  type: array
+                rules:
+                  items:
+                    description: DetectActionRules define detectors and actions
+                    properties:
+                      actions:
+                        items:
+                          description: DetectAction define detector config
+                          properties:
+                            args:
+                              type: string
+                            name:
+                              type: string
+                          required:
+                            - args
+                            - name
+                          type: object
+                        type: array
+                      detects:
+                        items:
+                          description: DetectAction define detector config
+                          properties:
+                            args:
+                              type: string
+                            name:
+                              type: string
+                          required:
+                            - args
+                            - name
+                          type: object
+                        type: array
+                    type: object
+                  type: array
+                type:
+                  type: string
+              required:
+                - checkInterval
+                - handleInterval
+                - metrics
+                - name
+                - recoverInterval
+                - rules
+                - type
+              type: object
+            status:
+              description: RuleCheckStatus is the status for a RuleCheck resource
+              type: object
+          required:
+            - spec
+          type: object
+      served: true
+      storage: true
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  name: cgroupnotifies.caelus.io
+spec:
+  group: caelus.io
+  names:
+    kind: CgroupNotify
+    listKind: CgroupNotifyList
+    plural: cgroupnotifies
+    singular: cgroupnotify
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: CgroupNotify is a specification for a CgroupNotify resource
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: CgroupNotifySpec is the spec for a CgroupNotify resource
+            properties:
+              memory_cgroup:
+                description: MemoryNotifyConfig describe memory cgroup notify
+                properties:
+                  pressures:
+                    items:
+                      description: MemoryPressureNotifyConfig describe memory.pressure_level
+                        notify data
+                      properties:
+                        cgroups:
+                          items:
+                            type: string
+                          type: array
+                        count:
+                          description: assign event number in the duration time
+                          type: integer
+                        duration:
+                          description: assign time duration the pressure has kept
+                          format: int64
+                          type: integer
+                        pressure_level:
+                          type: string
+                      required:
+                      - cgroups
+                      - count
+                      - duration
+                      - pressure_level
+                      type: object
+                    type: array
+                  usages:
+                    items:
+                      description: MemoryUsageNotifyConfig describe memory.usage_in_bytes
+                        notify data
+                      properties:
+                        cgroups:
+                          items:
+                            type: string
+                          type: array
+                        duration:
+                          description: when to handle event after receiving event
+                          format: int64
+                          type: integer
+                        margin_mb:
+                          description: the distance between limit and threshold
+                          type: integer
+                      required:
+                      - cgroups
+                      - duration
+                      - margin_mb
+                      type: object
+                    type: array
+                required:
+                - pressures
+                - usages
+                type: object
+              nodeSelector:
+                additionalProperties:
+                  type: string
+                type: object
+              priority:
+                format: int32
+                type: integer
+            required:
+            - memory_cgroup
+            type: object
+          status:
+            description: CgroupNotifyStatus is the status for a CgroupNotify resource
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: caelus
   namespace: kube-system
 ---
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
@@ -20,8 +284,13 @@ rules:
   - apiGroups: [""]
     resources: ["pods/eviction"]
     verbs: ["create"]
+  - apiGroups: ["caelus.io"]
+    resources:
+    - rulechecks
+    - cgroupnotifies
+    verbs: ["list", "watch", "get", "update", "delete"]
 ---
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   annotations:

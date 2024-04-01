@@ -24,7 +24,7 @@ import (
 	"github.com/tencent/caelus/pkg/caelus/checkpoint"
 	"github.com/tencent/caelus/pkg/caelus/cpi"
 	"github.com/tencent/caelus/pkg/caelus/diskquota"
-	"github.com/tencent/caelus/pkg/caelus/healthcheck"
+	health "github.com/tencent/caelus/pkg/caelus/healthcheck"
 	"github.com/tencent/caelus/pkg/caelus/healthcheck/conflict"
 	"github.com/tencent/caelus/pkg/caelus/metrics"
 	"github.com/tencent/caelus/pkg/caelus/online"
@@ -244,9 +244,13 @@ func (o *options) initModules(caelus *types.CaelusConfig, ctx *context.CaelusCon
 		o.ApiOption.loadStatsMetric(metrics.StatsMetricDiskQuota, diskquotaManager)
 	}
 	// health check manager
-	healthCheckManager = health.NewHealthManager(types.InitHealthCheckConfigFunc(&caelus.Metrics.Node,
-		&caelus.Predicts[0].ReserveResource), stStore, resourceManager, qosManager,
-		conflictMn, podInformer)
+	nodeInformer := ctx.GetNodeFactory().Core().V1().Nodes()
+	ruleCheckInformer := ctx.GetCaelusFactory().Caelus().V1().RuleChecks()
+	cgroupNotifyInformer := ctx.GetCaelusFactory().Caelus().V1().CgroupNotifies()
+
+	healthCheckManager = health.NewHealthManager(stStore, resourceManager, qosManager, conflictMn, podInformer,
+		nodeInformer, ruleCheckInformer, cgroupNotifyInformer, &caelus.Predicts[0].ReserveResource,
+		types.RuleCheckAvailableFunc(&caelus.Metrics.Node, &caelus.Predicts[0].ReserveResource))
 	modules = append(modules, healthCheckManager)
 
 	return modules
